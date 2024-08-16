@@ -12,6 +12,9 @@ module.exports = {
         'thin8': ['CompaqThin8'],
         'thin14': ['CompaqThin14'],
         'thin16': ['CompaqThin16']
+      },
+      boxShadow: {
+        'box': '5px 5px 0px black'
       }
     },
   },
