@@ -1,6 +1,6 @@
 FROM debian:bookworm-slim
 RUN mkdir /app
-COPY target/aarch64-unknown-linux-gnu/binrelease /app/server
+COPY target/aarch64-unknown-linux-gnu/binrelease/server /app/server
 COPY target/site /app/target/site
 COPY Cargo.toml /app/Cargo.toml
 
