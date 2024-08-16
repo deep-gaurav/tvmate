@@ -67,8 +67,8 @@ jobs:
     # - name: Load Docker image
     #   run: docker load --input /tmp/myimage.tar
 
-    - name: Export image
-      run: docker save syncedcrt:latest -o syncedcrt.tar
+    # - name: Export image
+    #   run: docker save syncedcrt:latest -o syncedcrt.tar
 
     - name: Compress image
       run: gzip syncedcrt.tar
