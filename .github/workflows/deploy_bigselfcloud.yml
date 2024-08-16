@@ -62,14 +62,17 @@ jobs:
         push: false
         tags: syncedcrt:latest
         file: Dockerfile.arm64
-        outputs: type=image
+        outputs: type=docker,dest=syncedcrt.tar
+
+    # - name: Load Docker image
+    #   run: docker load --input /tmp/myimage.tar
 
     - name: Export image
       run: docker save syncedcrt:latest -o syncedcrt.tar
 
     - name: Compress image
       run: gzip syncedcrt.tar
-      
+
     - name: Push To SelfCloud
       run: |
         curl --location --fail --show-error 'https://bigcloud.deepwith.in/cloud/image/push' --form 'project_id="1c167755-6fc3-44fa-b538-9a5d75374a60"' --form "token=$SELFCLOUD_TOKEN" --form 'image=@"syncedcrt.tar.gz"'
