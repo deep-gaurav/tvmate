@@ -41,8 +41,13 @@ pub fn App() -> impl IntoView {
 #[component]
 fn HomePage() -> impl IntoView {
     view! {
-        <div class="h-full w-full flex items-center justify-center text-white">
+        <div class="h-full w-full flex flex-col items-center justify-center text-white">
             <h1 class="font-bold2 text-xl"> "Welcome to SyncedCRT" </h1>
+            <div class="h-4" />
+            <div class="flex gap-4">
+                <A href="/host" class="font-bold1 text-lg"> "[ Host ]" </A>
+                <A href="/join" class="font-bold1 text-lg"> "[ Join ]" </A>
+            </div>
         </div>
     }
 }
