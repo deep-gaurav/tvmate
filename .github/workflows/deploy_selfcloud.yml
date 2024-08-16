@@ -26,7 +26,9 @@ jobs:
           ${{ runner.os }}-build-${{ env.cache-name }}-
           ${{ runner.os }}-build-
           ${{ runner.os }}-
-
+            
+    - name: Install dependencies
+      run: sudo apt update && sudo apt install -y clang cmake libevent-dev libclang-dev libcurl4-openssl-dev curl gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
     - run: rustup toolchain install nightly-2024-08-15
     - name: Add wasm32
       run: rustup target add wasm32-unknown-unknown
