@@ -45,6 +45,9 @@ jobs:
     - name: Install Cargo Leptos
       run: cargo install cargo-leptos
 
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
     - name: Build
       run: cargo leptos build --release
         
@@ -58,6 +61,7 @@ jobs:
         platforms: linux/arm64
         push: false
         tags: syncedcrt:latest
+        file: Dockerfile.arm64
 
     # - name: Build Docker image
     #   run: |
