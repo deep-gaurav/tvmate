@@ -48,8 +48,8 @@ jobs:
     - name: Build
       run: cargo leptos build --release
         
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
+    - name: Car target
+      run: ls -la target
 
     - name: Build and push
       uses: docker/build-push-action@v6
