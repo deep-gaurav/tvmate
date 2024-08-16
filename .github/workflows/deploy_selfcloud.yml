@@ -21,7 +21,7 @@ jobs:
         key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/Cargo.lock') }}
         path: |
           /home/runner/.cargo
-          /home/runner/work/self-cloud/self-cloud/target
+          /home/runner/work/synced-crt/synced-crt/target
         restore-keys: |
           ${{ runner.os }}-build-${{ env.cache-name }}-
           ${{ runner.os }}-build-
