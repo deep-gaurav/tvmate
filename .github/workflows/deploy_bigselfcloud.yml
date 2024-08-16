@@ -48,9 +48,19 @@ jobs:
     - name: Build
       run: cargo leptos build --release
         
-    - name: Build Docker image
-      run: |
-        docker build -f Dockerfile.arm64 --platform linux/arm64 -t syncedcrt:latest .
+    # - name: Set up QEMU
+    #   uses: docker/setup-qemu-action@v3
+
+    - name: Build and push
+      uses: docker/build-push-action@v6
+      with:
+        platforms: linux/arm64
+        push: false
+        tags: syncedcrt:latest
+
+    # - name: Build Docker image
+    #   run: |
+    #     docker build -f Dockerfile.arm64 --platform linux/arm64 -t syncedcrt:latest .
     - name: Save Docker image to a .tar file
       run: |
         docker save syncedcrt:latest -o syncedcrt.tar.gz
