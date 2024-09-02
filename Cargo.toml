@@ -2,7 +2,7 @@ cargo-features = ["codegen-backend"]
 
 [workspace]
 resolver = "2"
-members = ["app", "frontend", "server"]
+members = ["app", "common", "frontend", "server"]
 
 # need to be applied only to wasm build
 [profile.release]
@@ -37,18 +37,27 @@ leptos_meta = { version = "0.6" }
 leptos_router = { version = "0.6" }
 leptos_axum = { version = "0.6" }
 
-axum = "0.7"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tracing-subscriber-wasm = "0.1.0"
+tracing-journald = "0.3.0"
+
+axum = { version = "0.7", features = ["http2", "ws", "macros"] }
 cfg-if = "1"
 console_error_panic_hook = "0.1.7"
-console_log = "1"
 http = "1"
-log = "0.4.20"
-simple_logger = "5"
 thiserror = "1"
 tokio = { version = "1.33.0", features = ["full"] }
 tower = { version = "0.5", features = ["full"] }
 tower-http = { version = "0.5", features = ["full"] }
 wasm-bindgen = "=0.2.93"
+rand = "0.8.5"
+leptos-use = "0.13.0"
+serde = { version = "1", features = ["derive"] }
+bincode = "1"
+uuid = { version = "1.10.0", features = ["v4", "serde"] }
+serde_urlencoded = "0.7.1"
+codee = { version = "0.2.0", features = ["bincode_serde"] }
 
 # See https://github.com/akesson/cargo-leptos for documentation of all the parameters.
 
