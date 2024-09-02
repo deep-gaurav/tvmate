@@ -3,9 +3,8 @@ use crate::error_template::{AppError, ErrorTemplate};
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
-use leptos_use::use_websocket;
 use networking::room_manager::RoomManager;
-use tracing::info;
+use pages::room::RoomPage;
 
 use crate::pages::home_page::HomePage;
 
@@ -41,6 +40,7 @@ pub fn App() -> impl IntoView {
                     <div class="absolute left-[7%] w-[68%] top-[11%] h-[79%] bg-slate-800" >
                         <Routes>
                             <Route path="" view=HomePage/>
+                            <Route path="room/:id" view=RoomPage/>
                         </Routes>
                     </div>
                 </div>

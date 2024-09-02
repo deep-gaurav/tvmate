@@ -4,10 +4,10 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use common::{
-    message::Message,
+    message::{Message, RoomJoinInfo},
     message_sender::MessageSender,
     params::{HostParams, JoinParams},
-    RoomProviderError, User,
+    RoomProviderError, User, UserMeta,
 };
 use leptos::logging::warn;
 use serde::{Deserialize, Serialize};
@@ -31,8 +31,10 @@ pub async fn host_room(
     let (tx, rx) = tokio::sync::mpsc::channel(10);
     let user_id = Uuid::new_v4();
     let user = User {
-        id: user_id,
-        name: host_params.name,
+        meta: UserMeta {
+            id: user_id,
+            name: host_params.name,
+        },
         sender: tx,
     };
     let room_id = app_state.rooms.new_room(user).await?;
@@ -43,7 +45,7 @@ pub async fn host_room(
         ))
         .await;
 
-        handle_websocket(app_state, &room_id, user_id, msgs, rx).await;
+        handle_websocket(app_state, &room_id.room_id, user_id, msgs, rx).await;
     }))
 }
 
@@ -53,21 +55,23 @@ pub async fn join_room(
     Query(join_params): Query<JoinParams>,
     ws: WebSocketUpgrade,
 ) -> Result<Response, RoomJoinError> {
-    let (tx, rx) = tokio::sync::mpsc::channel(10);
+    let (tx, rx) = tokio::sync::mpsc::channel(10); // 10 is random here.
     let user_id = Uuid::new_v4();
     let user = User {
-        id: user_id,
-        name: join_params.name,
+        meta: UserMeta {
+            id: user_id,
+            name: join_params.name,
+        },
         sender: tx,
     };
-    app_state
+    let join_info = app_state
         .rooms
         .join_room(&join_params.room_id, user)
         .await?;
     let room_id = join_params.room_id;
     Ok(ws.on_upgrade(move |mut msgs| async move {
         msgs.send_message(&Message::ServerMessage(
-            common::message::ServerMessage::RoomCreated(room_id.clone()),
+            common::message::ServerMessage::RoomJoined(join_info),
         ))
         .await;
 

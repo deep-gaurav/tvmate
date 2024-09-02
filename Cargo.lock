@@ -87,6 +87,7 @@ dependencies = [
  "serde_urlencoded",
  "thiserror",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

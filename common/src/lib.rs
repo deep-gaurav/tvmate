@@ -12,10 +12,15 @@ use uuid::Uuid;
 pub use crate::ssr::*;
 
 pub struct User {
-    pub id: Uuid,
-    pub name: String,
+    pub meta: UserMeta,
     #[cfg(feature = "ssr")]
     pub sender: tokio::sync::mpsc::Sender<Message>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserMeta {
+    pub id: Uuid,
+    pub name: String,
 }
 
 pub struct Room {
@@ -24,6 +29,7 @@ pub struct Room {
 
 #[cfg(feature = "ssr")]
 mod ssr {
+    use message::RoomJoinInfo;
     use thiserror::Error;
     use tokio::sync::RwLock;
     use util::generate_random_string;
@@ -51,7 +57,7 @@ mod ssr {
             }
         }
 
-        pub async fn new_room(&self, user: User) -> Result<String, RoomProviderError> {
+        pub async fn new_room(&self, user: User) -> Result<RoomJoinInfo, RoomProviderError> {
             let mut rooms = self.rooms.write().await;
             let id = {
                 let mut tries = 5;
@@ -66,16 +72,29 @@ mod ssr {
                     }
                 }
             };
-
+            let user_meta = user.meta.clone();
             rooms.insert(id.clone(), Room::new(user));
-            Ok(id)
+            Ok(RoomJoinInfo {
+                room_id: id,
+                user_id: user_meta.id,
+                users: vec![user_meta],
+            })
         }
 
-        pub async fn join_room(&self, room_id: &str, user: User) -> Result<(), RoomProviderError> {
+        pub async fn join_room(
+            &self,
+            room_id: &str,
+            user: User,
+        ) -> Result<RoomJoinInfo, RoomProviderError> {
             let mut rooms = self.rooms.write().await;
+            let user_id = user.meta.id.clone();
             if let Some(room) = rooms.get_mut(room_id) {
                 room.users.push(user);
-                Ok(())
+                Ok(RoomJoinInfo {
+                    room_id: room_id.to_string(),
+                    user_id,
+                    users: room.users.iter().map(|u| u.meta.clone()).collect(),
+                })
             } else {
                 Err(RoomProviderError::RoomDoesntExist)
             }
@@ -84,7 +103,7 @@ mod ssr {
         pub async fn remove_user(&self, room_id: &str, user_id: Uuid) {
             let mut rooms = self.rooms.write().await;
             if let Some(room) = rooms.get_mut(room_id) {
-                room.users.retain(|user| user.id == user_id);
+                room.users.retain(|user| user.meta.id == user_id);
                 if room.users.is_empty() {
                     rooms.remove(room_id);
                 }

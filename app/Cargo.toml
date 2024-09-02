@@ -22,6 +22,7 @@ common = { path = "../common", default-features = false, features = [
 ] }
 codee = { workspace = true }
 serde_urlencoded = { workspace = true }
+uuid.workspace = true
 
 [features]
 default = []
