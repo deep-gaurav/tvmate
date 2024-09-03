@@ -13,6 +13,11 @@ pub mod error_template;
 pub mod networking;
 pub mod pages;
 
+#[derive(Clone)]
+pub struct MountPoints {
+    pub handle_point: NodeRef<leptos::html::Div>,
+}
+
 #[component]
 pub fn App() -> impl IntoView {
     // Provides context that manages stylesheets, titles, meta tags, etc.
@@ -21,6 +26,12 @@ pub fn App() -> impl IntoView {
     let room_manager = RoomManager::new();
 
     provide_context(room_manager);
+
+    let handle_point = create_node_ref();
+
+    let mount_points = MountPoints { handle_point };
+
+    provide_context(mount_points);
 
     view! {
         <Stylesheet id="leptos" href="/pkg/syncedcrt.css"/>
@@ -42,6 +53,8 @@ pub fn App() -> impl IntoView {
                             <Route path="" view=HomePage/>
                             <Route path="room/:id" view=RoomPage/>
                         </Routes>
+                    </div>
+                    <div class="absolute left-[81.5%] w-[16%] top-[6%] h-[30%] z-20" ref=handle_point>
                     </div>
                 </div>
             </main>

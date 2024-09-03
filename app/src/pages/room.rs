@@ -1,8 +1,15 @@
+use std::ops::Deref;
+
 use leptos::*;
 use leptos_meta::Title;
 use leptos_router::*;
 use tracing::info;
 use wasm_bindgen::{JsCast, UnwrapThrowExt};
+
+use crate::{
+    components::{portal::Portal, room_info::RoomInfo, video_player::VideoPlayer},
+    MountPoints,
+};
 
 #[derive(Params, PartialEq, Clone)]
 struct RoomParam {
@@ -11,30 +18,16 @@ struct RoomParam {
 #[component]
 pub fn RoomPage() -> impl IntoView {
     let params = use_params::<RoomParam>();
-    let video_ref = create_node_ref::<leptos::html::Video>();
     let (video_url, set_video_url) = create_signal(None);
+
     view! {
         {
             move || if let Ok(RoomParam { id: Some(room_id) }) = params.get() {
                 if !room_id.is_empty() {
                     view! {
                         <Title text=format!("Room {room_id}")/>
-                        <video ref=video_ref
-                            class=("hidden",move || video_url.with(|v|v.is_none()))
-                            class="h-full w-full"
-                        >
-                            {
-                                move || {
-                                    if let Some(url) = video_url.get(){
-                                        view! {
-                                            <source src=url />
-                                        }.into_view()
-                                    }else {
-                                        view! {}.into_view()
-                                    }
-                                }
-                            }
-                        </video>
+                        <VideoPlayer src=video_url />
+                        <RoomInfo />
                         <div class="h-full w-full flex px-10 py-4 items-center justify-center flex-col"
                             class=("hidden",move || video_url.with(|v|v.is_some()))
                         >
