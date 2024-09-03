@@ -1,4 +1,4 @@
-use std::{borrow::BorrowMut, cell::RefCell, marker::PhantomData, rc::Rc};
+use std::marker::PhantomData;
 
 use codee::binary::BincodeSerdeCodec;
 use common::{
@@ -7,13 +7,11 @@ use common::{
     params::{HostParams, JoinParams},
     UserMeta,
 };
-use leptos::{
-    create_effect, logging::warn, on_cleanup, store_value, Signal, SignalGet, StoredValue,
-};
+use leptos::{create_effect, logging::warn, store_value, Signal, SignalGet, StoredValue};
 use leptos_router::use_navigate;
 use leptos_use::{use_websocket, UseWebSocketReturn};
 use thiserror::Error;
-use tracing::info;
+use tracing::{debug, info};
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -37,7 +35,7 @@ where
     pub id: String,
     pub user_id: Uuid,
     pub users: Vec<UserMeta>,
-    connection: WebsocketContext<Tx>,
+    pub connection: WebsocketContext<Tx>,
 }
 
 #[derive(Error, Debug)]
@@ -88,6 +86,7 @@ impl RoomManager {
                 let UseWebSocketReturn {
                     send,
                     message,
+                    ready_state,
                     close,
                     ..
                 } = use_websocket::<Message, Message, BincodeSerdeCodec>(&format!(
@@ -95,9 +94,22 @@ impl RoomManager {
                 ));
                 let messages_c = message.clone();
                 let state_c = self.state.clone();
+                create_effect(move |_| match ready_state.get() {
+                    leptos_use::core::ConnectionReadyState::Connecting => {
+                        info!("Connecting to ws")
+                    }
+                    leptos_use::core::ConnectionReadyState::Open => {
+                        info!("Opened ws")
+                    }
+                    leptos_use::core::ConnectionReadyState::Closing
+                    | leptos_use::core::ConnectionReadyState::Closed => {
+                        close();
+                        state_c.update_value(|v| *v = RoomState::Disconnected);
+                    }
+                });
                 create_effect(move |_| {
                     let message = messages_c.get();
-                    info!("Received message {message:#?}");
+                    debug!("Received message {message:#?}");
                     if let Some(message) = message {
                         match message {
                             Message::ServerMessage(message) => match message {
@@ -123,8 +135,8 @@ impl RoomManager {
                             Message::ClientMessage => {}
                         }
                     } else {
-                        close();
-                        state_c.update_value(|v| *v = RoomState::Disconnected);
+                        info!("Received nothing, closing");
+                        // close();
                     }
                 });
                 // info!("is connecting {is_connecting}");
