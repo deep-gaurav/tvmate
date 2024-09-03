@@ -59,6 +59,10 @@ uuid = { version = "1.10.0", features = ["v4", "serde"] }
 serde_urlencoded = "0.7.1"
 codee = { version = "0.2.0", features = ["bincode_serde"] }
 
+[workspace.dependencies.web-sys]
+version = "0.3.70"
+features = ["File", "Blob"]
+
 # See https://github.com/akesson/cargo-leptos for documentation of all the parameters.
 
 # A leptos project defines which workspace members
