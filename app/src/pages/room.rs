@@ -61,8 +61,6 @@ pub fn RoomPage() -> impl IntoView {
                                         if let Some(file) = files.and_then(|f|f.item(0)) {
                                             let blob = file.unchecked_ref::<web_sys::Blob>();
                                             info!("Name: {}, Type: {}", file.name(), blob.type_());
-                                            let video_tag = video_ref.get_untracked().unwrap();
-
                                             let url = web_sys::Url::create_object_url_with_blob(blob);
                                             info!("Video URL {url:#?}");
                                             if let Ok(url) = url {
