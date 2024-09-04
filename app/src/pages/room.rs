@@ -25,10 +25,7 @@ pub fn RoomPage() -> impl IntoView {
     let room_manager = expect_context::<RoomManager>();
     create_effect(move |_| {
         if let Some(video_name) = video_name.get() {
-            room_manager.send_message(
-                common::message::ClientMessage::SelectedVideo(video_name),
-                crate::networking::room_manager::SendType::Reliable,
-            );
+            room_manager.set_selected_video(video_name);
         }
     });
 

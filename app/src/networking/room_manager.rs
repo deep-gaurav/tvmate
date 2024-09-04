@@ -48,7 +48,7 @@ where
     Connecting(
         (
             WebsocketContext<Tx>,
-            Option<WebSocket>,
+            StoredValue<Option<WebSocket>>,
             Signal<ConnectionReadyState>,
         ),
     ),
@@ -97,7 +97,7 @@ where
     Tx: 'static,
 {
     pub connection: WebsocketContext<Tx>,
-    pub socket: Option<WebSocket>,
+    pub socket: StoredValue<Option<WebSocket>>,
     pub ready_state: Signal<ConnectionReadyState>,
 }
 
@@ -208,7 +208,6 @@ impl RoomManager {
                             leptos_use::core::ConnectionReadyState::Closing
                             | leptos_use::core::ConnectionReadyState::Closed => {
                                 // close();
-                                info!("Borrow mut for disconnect");
                                 let mut state = state_c1.borrow_mut();
                                 *state = RoomState::Disconnected;
                                 drop(state);
@@ -218,7 +217,6 @@ impl RoomManager {
                     });
                     create_effect(move |_| {
                         let message = messages_c.get();
-                        info!("Received message {message:#?}");
                         if let Some(message) = message {
                             match message {
                                 Message::ServerMessage(message) => match message {
@@ -240,11 +238,10 @@ impl RoomManager {
                                             };
                                             let connection_info = RoomConnectionInfo {
                                                 connection: unsafe { std::ptr::read(connection) },
-                                                socket: unsafe { std::ptr::read(socket) },
+                                                socket: socket.clone(),
                                                 ready_state: unsafe { std::ptr::read(ready_state) },
                                             };
                                             drop(state_c_ref);
-                                            info!("Borrow mut for connected");
                                             let mut state = state_c.borrow_mut();
                                             *state = RoomState::Connected(connection_info);
                                             drop(state);
@@ -401,30 +398,40 @@ impl RoomManager {
         }
     }
 
+    pub fn set_selected_video(&self, video_name: String) {
+        if let Some(mut room_info) = self.room_info_signal.0.get_untracked() {
+            if let Some(user) = room_info
+                .users
+                .iter_mut()
+                .find(|u| u.id == room_info.user_id)
+            {
+                user.state = UserState::VideoSelected(video_name.clone());
+                self.room_info_signal.1.set(Some(room_info));
+                self.send_message(
+                    common::message::ClientMessage::SelectedVideo(video_name),
+                    crate::networking::room_manager::SendType::Reliable,
+                );
+            }
+        }
+    }
+
     pub fn send_message(&self, message: ClientMessage, send_type: SendType) {
-        info!("Sending message");
         with_owner(self.owner, || {
             if let Some(player_id) = self
                 .room_info_signal
                 .0
                 .with_untracked(|r| r.as_ref().map(|r| r.user_id))
             {
-                info!("player {player_id}");
                 if let RoomState::Connected(RoomConnectionInfo {
-                    connection,
-                    socket,
-                    ready_state,
+                    connection, socket, ..
                 }) = &*self.state.borrow()
                 {
-                    info!("Check ready state");
-                    info!("{}", ready_state.get_untracked());
                     match send_type {
                         SendType::Reliable => {
-                            info!("Send msg");
                             connection.send(Message::ClientMessage((player_id, message)));
                         }
                         SendType::UnReliablle => {
-                            if let Some(socket) = socket {
+                            if let Some(socket) = socket.get_value() {
                                 if socket.buffered_amount() < 5 {
                                     connection.send(Message::ClientMessage((player_id, message)));
                                 }

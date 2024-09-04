@@ -30,25 +30,25 @@ pub fn RoomInfo() -> impl IntoView {
                             }}
                         </div>
                         <hr class="border-white border-t w-full" />
-                        <For
-                            each=move || {
-                                room_info
-                                    .with(|r| r.as_ref().map(|r| r.users.clone()))
-                                    .unwrap_or_default()
-                            }
-                            key=|user| user.id
-                            children=|user| {
-                                view! {
-                                    <div class="text-left w-full mt-2">
-                                        "> " {user.name}
-                                        {match user.state {
-                                            common::UserState::VideoNotSelected => "⌛",
-                                            common::UserState::VideoSelected(_) => "✔️",
-                                        }}
-                                    </div>
-                                }
-                            }
-                        />
+
+                        {move || {
+                            room_info
+                                .with(|r| r.as_ref().map(|r| r.users.clone()))
+                                .unwrap_or_default()
+                                .into_iter()
+                                .map(|user| {
+                                    view! {
+                                        <div class="text-left w-full mt-2">
+                                            "> " {user.name}
+                                            {match user.state {
+                                                common::UserState::VideoNotSelected => "⌛",
+                                                common::UserState::VideoSelected(_) => "✔️",
+                                            }}
+                                        </div>
+                                    }
+                                })
+                                .collect::<Vec<_>>()
+                        }}
                     </Portal>
                 }
                     .into_view()

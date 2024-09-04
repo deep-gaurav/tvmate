@@ -72,15 +72,17 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                     | VideoState::Suspend => PlayerStatus::Paused(0.0),
                 };
                 match &message {
-                    crate::networking::room_manager::PlayerMessages::Play(_) => {
+                    crate::networking::room_manager::PlayerMessages::Play(time) => {
                         if player_status.is_paused() {
+                            video.set_current_time(*time);
                             if let Err(err) = video.play() {
                                 warn!("Can not play video {err:#?}")
                             }
                         }
                     }
-                    crate::networking::room_manager::PlayerMessages::Pause(_) => {
+                    crate::networking::room_manager::PlayerMessages::Pause(time) => {
                         if !player_status.is_paused() {
+                            video.set_current_time(*time);
                             if let Err(err) = video.pause() {
                                 warn!("Can not play video {err:#?}")
                             }
@@ -108,7 +110,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
 
     create_effect(move |_| {
         let video_state = video_state.get();
-        let time = current_time.get().unwrap_or_default();
+        let time = current_time.get_untracked().unwrap_or_default();
         let player_status = match video_state {
             VideoState::Playing => PlayerStatus::Playing(time),
             VideoState::Paused

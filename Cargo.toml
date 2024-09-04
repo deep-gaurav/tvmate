@@ -52,7 +52,7 @@ tower = { version = "0.5", features = ["full"] }
 tower-http = { version = "0.5", features = ["full"] }
 wasm-bindgen = "=0.2.93"
 rand = "0.8.5"
-leptos-use = "0.13.0"
+leptos-use = { git = "https://github.com/deep-gaurav/leptos-use.git", branch = "fix/return-stored-websocket" } # Temporary fix to return StoreValue<Option<WebSocket>>
 serde = { version = "1", features = ["derive"] }
 bincode = "1"
 uuid = { version = "1.10.0", features = ["v4", "serde"] }
