@@ -23,22 +23,6 @@ body {
 	}
 }
 
-.main-cont {
-	container-type: inline-size;
-
-	.tv-cont {
-
-		width: 100%;
-
-		@container (min-width: 138cqh) {
-			width: unset;
-			height: 100%;
-		}
-
-	}
-}
-
-
 
 @font-face {
 	font-family: 'Compaq2x';

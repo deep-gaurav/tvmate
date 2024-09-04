@@ -3,6 +3,7 @@ use crate::error_template::{AppError, ErrorTemplate};
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
+use leptos_use::{use_window_size, UseWindowSizeReturn};
 use networking::room_manager::RoomManager;
 use pages::room::RoomPage;
 
@@ -16,6 +17,7 @@ pub mod pages;
 #[derive(Clone)]
 pub struct MountPoints {
     pub handle_point: NodeRef<leptos::html::Div>,
+    pub side_point: NodeRef<leptos::html::Div>,
 }
 
 #[component]
@@ -28,10 +30,18 @@ pub fn App() -> impl IntoView {
     provide_context(room_manager);
 
     let handle_point = create_node_ref();
+    let side_point = create_node_ref();
 
-    let mount_points = MountPoints { handle_point };
+    let mount_points = MountPoints {
+        handle_point,
+        side_point,
+    };
 
     provide_context(mount_points);
+
+    let UseWindowSizeReturn { width, height } = use_window_size();
+
+    let is_landscape = create_memo(move |_| width.get() / height.get() > 1042.0 / 751.0);
 
     view! {
         <Stylesheet id="leptos" href="/pkg/syncedcrt.css" />
@@ -45,8 +55,20 @@ pub fn App() -> impl IntoView {
             outside_errors.insert_with_default_key(AppError::NotFound);
             view! { <ErrorTemplate outside_errors /> }.into_view()
         }>
-            <main class="bg-black h-full w-full flex justify-center items-center main-cont text-white font-thin8">
-                <div class="relative tv-cont aspect-[1042/751] ">
+            <main
+                class="bg-black h-full w-full flex justify-center items-center text-white font-thin8"
+                style=move || {
+                    if is_landscape.get() {
+                        "flex-direction:row;"
+                    } else {
+                        "flex-direction:column;"
+                    }
+                }
+            >
+                <div
+                    class="relative aspect-[1042/751] "
+                    style=move || { if is_landscape.get() { "height:100%" } else { "width:100%" } }
+                >
                     <div class="h-full w-full absolute bg-cover bg-center bg-no-repeat bg-[url('/assets/images/synced_crt.png')] z-10 pointer-events-none" />
                     <div class="absolute left-[7%] w-[68%] top-[11%] h-[79%] bg-slate-800">
                         <Routes>
@@ -59,6 +81,8 @@ pub fn App() -> impl IntoView {
                         ref=handle_point
                     ></div>
                 </div>
+
+                <div ref=side_point></div>
             </main>
         </Router>
     }

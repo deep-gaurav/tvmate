@@ -1,3 +1,4 @@
+pub mod chatbox;
 pub mod dialog;
 pub mod portal;
 pub mod room_info;

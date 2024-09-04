@@ -255,33 +255,41 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                     }}
                 </button>
 
-
-                <div class="absolute w-[90%] top-[80%] left-[5%] h-4 bg-white/45 cursor-pointer"
-                    on:click=move|ev|{
+                <div
+                    class="absolute w-[90%] top-[80%] left-[5%] h-4 bg-white/45 cursor-pointer"
+                    on:click=move |ev| {
                         let x = ev.offset_x();
-                        if let Some(element) = ev.target(){
-                            let width = element.unchecked_into::<web_sys::HtmlElement>().offset_width();
-                            if let (Some(video), Some(total)) = (video_node.get_untracked(), duration.get_untracked()){
-                                let new_time = (x as f64)/(width as f64)  * total;
+                        if let Some(element) = ev.target() {
+                            let width = element
+                                .unchecked_into::<web_sys::HtmlElement>()
+                                .offset_width();
+                            if let (Some(video), Some(total)) = (
+                                video_node.get_untracked(),
+                                duration.get_untracked(),
+                            ) {
+                                let new_time = (x as f64) / (width as f64) * total;
                                 video.set_current_time(new_time);
-                                room_manager_c.send_message(
-                                    common::message::ClientMessage::Seek(new_time),
-                                    crate::networking::room_manager::SendType::Reliable
-                                );
+                                room_manager_c
+                                    .send_message(
+                                        common::message::ClientMessage::Seek(new_time),
+                                        crate::networking::room_manager::SendType::Reliable,
+                                    );
                             }
                         }
                     }
                 >
                     <div
                         class="absolute top-0 left-0 h-full bg-white pointer-events-none"
-                        style=
-                        {move || {
-                            if let (Some(elapsed), Some(total)) = (current_time.get(), duration.get()) {
+                        style=move || {
+                            if let (Some(elapsed), Some(total)) = (
+                                current_time.get(),
+                                duration.get(),
+                            ) {
                                 format!("width: {}%;", elapsed * 100.0 / total)
                             } else {
                                 "".to_string()
                             }
-                        }}
+                        }
                     />
                 </div>
 

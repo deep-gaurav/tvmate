@@ -20,6 +20,8 @@ pub fn Portal(
     /// The children to teleport into the `mount` element
     children: ChildrenFn,
 
+    #[prop(optional, into)] mount_class: Option<String>,
+
     #[prop(optional, into)] class: Option<String>,
 ) -> impl IntoView {
     cfg_if! { if #[cfg(all(target_arch = "wasm32", any(feature = "hydrate", feature = "csr")))] {
@@ -55,11 +57,20 @@ pub fn Portal(
 
             let _ = mount.append_child(&container);
 
+            let mut original_mount_class = None;
+            if let Some(mount_class) = &mount_class {
+                // tracing::info!("mount  class {}", mount.class_name());
+                original_mount_class = Some(mount.class_name());
+                mount.set_class_name(mount_class);
+            }
+
             on_cleanup({
                 let mount = mount.clone();
-
                 move || {
                     let _ = mount.remove_child(&container);
+                    if let Some(class) = original_mount_class {
+                        mount.set_class_name(&class);
+                    }
                 }
             })
         });

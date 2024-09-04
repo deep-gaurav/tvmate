@@ -7,7 +7,9 @@ use tracing::info;
 use wasm_bindgen::{JsCast, UnwrapThrowExt};
 
 use crate::{
-    components::{portal::Portal, room_info::RoomInfo, video_player::VideoPlayer},
+    components::{
+        chatbox::ChatBox, portal::Portal, room_info::RoomInfo, video_player::VideoPlayer,
+    },
     networking::room_manager::RoomManager,
     MountPoints,
 };
@@ -29,6 +31,9 @@ pub fn RoomPage() -> impl IntoView {
         }
     });
 
+    let (is_csr, set_is_csr) = create_signal(false);
+    create_effect(move |_| set_is_csr.set(true));
+
     view! {
         {move || {
             if let Ok(RoomParam { id: Some(room_id) }) = params.get() {
@@ -36,7 +41,18 @@ pub fn RoomPage() -> impl IntoView {
                     view! {
                         <Title text=format!("Room {room_id}") />
                         <VideoPlayer src=video_url />
-                        <RoomInfo />
+                        {
+                            move || {
+                                if is_csr.get(){
+                                    view! {
+                                        <RoomInfo />
+                                        <ChatBox />
+                                    }.into_view()
+                                }else {
+                                    view! {}.into_view()
+                                }
+                            }
+                        }
                         <div
                             class="h-full w-full flex px-10 py-4 items-center justify-center flex-col"
                             class=("hidden", move || video_url.with(|v| v.is_some()))
