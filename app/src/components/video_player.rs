@@ -76,16 +76,18 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                 match &message {
                     crate::networking::room_manager::PlayerMessages::Play(time) => {
                         if player_status.is_paused() {
-                            video.set_current_time(*time);
+                            info!("Received play");
                             if let Err(err) = video.play() {
+                                video.set_current_time(*time);
                                 warn!("Can not play video {err:#?}")
                             }
                         }
                     }
                     crate::networking::room_manager::PlayerMessages::Pause(time) => {
                         if !player_status.is_paused() {
-                            video.set_current_time(*time);
+                            info!("Received pause");
                             if let Err(err) = video.pause() {
+                                video.set_current_time(*time);
                                 warn!("Can not play video {err:#?}")
                             }
                         }
@@ -129,12 +131,14 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                 room_manager.set_player_status(player_status.clone());
                 match player_status {
                     PlayerStatus::Paused(time) => {
+                        info!("Sending pause");
                         room_manager.send_message(
                             common::message::ClientMessage::Pause(time),
                             crate::networking::room_manager::SendType::Reliable,
                         );
                     }
                     PlayerStatus::Playing(time) => {
+                        info!("Sending play");
                         room_manager.send_message(
                             common::message::ClientMessage::Play(time),
                             crate::networking::room_manager::SendType::Reliable,
