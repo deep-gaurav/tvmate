@@ -187,7 +187,16 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                 on:playing=move |_| { set_video_state.set(VideoState::Playing) }
                 on:stalled=move |_| { set_video_state.set(VideoState::Stalled) }
                 on:suspend=move |_| { set_video_state.set(VideoState::Suspend) }
-                // on:waiting=move |_| { set_video_state.set(VideoState::Waiting) }
+                on:waiting=move |_| { set_video_state.set(VideoState::Waiting) }
+                on:seeked=move |_| {
+                    if let Some(video) = video_node.get() {
+                        if video.paused() {
+                            set_video_state.set(VideoState::Paused)
+                        }else{
+                            set_video_state.set(VideoState::Playing)
+                        }
+                    }
+                }
 
                 on:durationchange=move |_| {
                     if let Some(video) = video_node.get() {
