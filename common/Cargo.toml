@@ -13,8 +13,9 @@ tracing = { workspace = true }
 bincode = { workspace = true }
 
 axum = { workspace = true, optional = true }
+futures = { workspace = true, optional = true }
 
 [features]
 default = []
 hydrate = []
-ssr = ["dep:tokio", "dep:axum"]
+ssr = ["dep:tokio", "dep:axum", "dep:futures"]

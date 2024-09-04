@@ -7,19 +7,23 @@ use std::{
 use codee::binary::BincodeSerdeCodec;
 use common::{
     endpoints,
-    message::Message,
+    message::{Message, UserJoined, UserLeft},
     params::{HostParams, JoinParams},
     UserMeta,
 };
 use leptos::{
     create_effect, create_signal, logging::warn, store_value, ReadSignal, Signal, SignalGet,
-    SignalSet, StoredValue, WriteSignal,
+    SignalGetUntracked, SignalSet, StoredValue, WriteSignal,
 };
 use leptos_router::use_navigate;
-use leptos_use::{use_websocket, UseWebSocketReturn};
+use leptos_use::{
+    use_websocket, use_websocket_with_options, UseWebSocketOptions, UseWebSocketReturn,
+};
 use thiserror::Error;
 use tracing::{debug, info};
 use uuid::Uuid;
+
+use crate::components::room_info;
 
 #[derive(Clone)]
 pub struct RoomManager {
@@ -80,7 +84,7 @@ where
     pub connection: WebsocketContext<Tx>,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct RoomInfo {
     pub id: String,
     pub user_id: Uuid,
@@ -141,47 +145,82 @@ impl RoomManager {
                     ready_state,
                     close,
                     ..
-                } = use_websocket::<Message, Message, BincodeSerdeCodec>(&format!(
-                    "{url}?{params}"
-                ));
+                } = use_websocket_with_options::<Message, Message, BincodeSerdeCodec>(
+                    &format!("{url}?{params}"),
+                    UseWebSocketOptions::default()
+                        .reconnect_limit(leptos_use::ReconnectLimit::Limited(0)),
+                );
                 let messages_c = message.clone();
                 let state_c = self.state.clone();
                 let state_c1 = self.state.clone();
+                let room_info_reader = self.room_info_signal.0;
                 let room_info_writer = self.room_info_signal.1;
-                create_effect(move |_| match ready_state.get() {
-                    leptos_use::core::ConnectionReadyState::Connecting => {
-                        info!("Connecting to ws")
-                    }
-                    leptos_use::core::ConnectionReadyState::Open => {
-                        info!("Opened ws")
-                    }
-                    leptos_use::core::ConnectionReadyState::Closing
-                    | leptos_use::core::ConnectionReadyState::Closed => {
-                        close();
-                        *state_c1.borrow_mut() = RoomState::Disconnected;
-                        room_info_writer.set(None);
+                create_effect(move |_| {
+                    let ws_state = ready_state.get();
+                    info!("WS State change {:#?}", ws_state);
+                    match ws_state {
+                        leptos_use::core::ConnectionReadyState::Connecting => {
+                            info!("Connecting to ws")
+                        }
+                        leptos_use::core::ConnectionReadyState::Open => {
+                            info!("Opened ws")
+                        }
+                        leptos_use::core::ConnectionReadyState::Closing
+                        | leptos_use::core::ConnectionReadyState::Closed => {
+                            // close();
+                            info!("Borrow mut for disconnect");
+                            let mut state = state_c1.borrow_mut();
+                            *state = RoomState::Disconnected;
+                            drop(state);
+                            room_info_writer.set(None);
+                        }
                     }
                 });
                 create_effect(move |_| {
                     let message = messages_c.get();
-                    debug!("Received message {message:#?}");
+                    info!("Received message {message:#?}");
                     if let Some(message) = message {
                         match message {
                             Message::ServerMessage(message) => match message {
                                 common::message::ServerMessage::RoomCreated(room_info)
                                 | common::message::ServerMessage::RoomJoined(room_info) => {
                                     let nav = use_navigate();
-                                    if let RoomState::Connecting(connection) = &*state_c.borrow() {
+                                    let state_c_ref = state_c.borrow();
+                                    if let RoomState::Connecting(connection) = &*state_c_ref {
                                         let room_info = RoomInfo {
                                             id: room_info.room_id.clone(),
                                             user_id: room_info.user_id.clone(),
-                                            users: vec![],
+                                            users: room_info.users,
                                         };
-                                        let connection = RoomConnectionInfo {
+                                        let connection_info = RoomConnectionInfo {
                                             connection: unsafe { std::ptr::read(connection) },
                                         };
-                                        *state_c.borrow_mut() = RoomState::Connected(connection);
+                                        drop(state_c_ref);
+                                        info!("Borrow mut for connected");
+                                        let mut state = state_c.borrow_mut();
+                                        *state = RoomState::Connected(connection_info);
+                                        drop(state);
                                         nav(&format!("/room/{}", room_info.id), Default::default());
+                                        room_info_writer.set(Some(room_info));
+                                    }
+                                }
+                                common::message::ServerMessage::UserJoined(UserJoined {
+                                    new_user,
+                                    users,
+                                }) => {
+                                    let room_info = room_info_reader.get_untracked();
+                                    if let Some(mut room_info) = room_info {
+                                        room_info.users = users;
+                                        room_info_writer.set(Some(room_info));
+                                    }
+                                }
+                                common::message::ServerMessage::UserLeft(UserLeft {
+                                    user_left,
+                                    users,
+                                }) => {
+                                    let room_info = room_info_reader.get_untracked();
+                                    if let Some(mut room_info) = room_info {
+                                        room_info.users = users;
                                         room_info_writer.set(Some(room_info));
                                     }
                                 }
@@ -194,8 +233,11 @@ impl RoomManager {
                     }
                 });
                 // info!("is connecting {is_connecting}");
-                *self.state.borrow_mut() =
+                info!("Borrow mut for connecting");
+                let mut state = self.state.borrow_mut();
+                *state =
                     RoomState::Connecting(WebsocketContext::new(message.clone(), Box::new(send)));
+                drop(state);
                 Ok(message)
             }
             Err(err) => {

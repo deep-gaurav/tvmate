@@ -58,6 +58,7 @@ bincode = "1"
 uuid = { version = "1.10.0", features = ["v4", "serde"] }
 serde_urlencoded = "0.7.1"
 codee = { version = "0.2.0", features = ["bincode_serde"] }
+futures = "0.3"
 
 [workspace.dependencies.web-sys]
 version = "0.3.70"

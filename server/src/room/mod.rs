@@ -4,7 +4,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use common::{
-    message::{Message, RoomJoinInfo},
+    message::{Message, RoomJoinInfo, UserJoined, UserLeft},
     message_sender::MessageSender,
     params::{HostParams, JoinParams},
     RoomProviderError, User, UserMeta,
@@ -12,6 +12,7 @@ use common::{
 use leptos::logging::warn;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use tracing::info;
 use uuid::Uuid;
 
 use crate::AppState;
@@ -64,11 +65,23 @@ pub async fn join_room(
         },
         sender: tx,
     };
+
     let join_info = app_state
         .rooms
         .join_room(&join_params.room_id, user)
         .await?;
     let room_id = join_params.room_id;
+    app_state
+        .rooms
+        .broadcast_msg_excluding(
+            &room_id,
+            Message::ServerMessage(common::message::ServerMessage::UserJoined(UserJoined {
+                new_user: join_info.user_id,
+                users: join_info.users.clone(),
+            })),
+            &[join_info.user_id],
+        )
+        .await;
     Ok(ws.on_upgrade(move |mut msgs| async move {
         msgs.send_message(&Message::ServerMessage(
             common::message::ServerMessage::RoomJoined(join_info),
@@ -115,6 +128,7 @@ async fn handle_websocket(
                                         //ignore
                                     },
                                     axum::extract::ws::Message::Close(_) => {
+                                        info!("Received Close from socket disconnecting {user_id}");
                                         break;
                                     },
                                 }
@@ -126,6 +140,7 @@ async fn handle_websocket(
                     },
                     None => {
                         // User disconnected
+                        info!("Received None from socket disconnecting {user_id}");
                         break;
                     },
                 }
@@ -137,13 +152,28 @@ async fn handle_websocket(
                     }
                     None => {
                         // Sender dropped, room closed?
+                        info!("Received None from rx disconnecting {user_id}");
                         break;
                     }
                 }
             }
         }
     }
-    app_state.rooms.remove_user(&room_id, user_id).await;
+    let remaining_users = app_state.rooms.remove_user(&room_id, user_id).await;
+    info!("Disconnected user {user_id}");
+    if let Some(users) = remaining_users {
+        app_state
+            .rooms
+            .broadcast_msg_excluding(
+                &room_id,
+                Message::ServerMessage(common::message::ServerMessage::UserLeft(UserLeft {
+                    user_left: user_id,
+                    users,
+                })),
+                &[user_id],
+            )
+            .await;
+    }
 }
 
 impl IntoResponse for RoomJoinError {

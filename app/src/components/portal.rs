@@ -30,7 +30,6 @@ pub fn Portal(
             .unwrap_or_else(|| document().body().expect("body to exist").unchecked_into());
 
         create_effect(move |_| {
-            leptos::logging::log!("inside Portal effect");
             let tag = if is_svg { "g" } else { "div" };
 
             let container = document()

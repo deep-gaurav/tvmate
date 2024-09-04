@@ -29,9 +29,11 @@ pub struct Room {
 
 #[cfg(feature = "ssr")]
 mod ssr {
+    use futures::{stream::FuturesUnordered, StreamExt, TryStreamExt};
     use message::RoomJoinInfo;
     use thiserror::Error;
     use tokio::sync::RwLock;
+    use tracing::warn;
     use util::generate_random_string;
 
     use super::*;
@@ -100,13 +102,43 @@ mod ssr {
             }
         }
 
-        pub async fn remove_user(&self, room_id: &str, user_id: Uuid) {
+        pub async fn broadcast_msg_excluding(
+            &self,
+            room_id: &str,
+            message: Message,
+            excluded_users: &[Uuid],
+        ) {
+            let rooms = self.rooms.read().await;
+            if let Some(room) = rooms.get(room_id) {
+                let send_futures = room
+                    .users
+                    .iter()
+                    .filter(|user| !excluded_users.contains(&user.meta.id))
+                    .map(|user| user.sender.send(message.clone()))
+                    .collect::<FuturesUnordered<_>>();
+
+                send_futures
+                    .into_stream()
+                    .for_each_concurrent(None, |data| async {
+                        if let Err(err) = data {
+                            warn!("broadcast failed {err:?}");
+                        }
+                    })
+                    .await;
+            }
+        }
+
+        pub async fn remove_user(&self, room_id: &str, user_id: Uuid) -> Option<Vec<UserMeta>> {
             let mut rooms = self.rooms.write().await;
             if let Some(room) = rooms.get_mut(room_id) {
-                room.users.retain(|user| user.meta.id == user_id);
+                room.users.retain(|user| user.meta.id != user_id);
+                let users = room.users.iter().map(|u| u.meta.clone()).collect();
                 if room.users.is_empty() {
                     rooms.remove(room_id);
                 }
+                Some(users)
+            } else {
+                None
             }
         }
     }

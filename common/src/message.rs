@@ -13,6 +13,20 @@ pub enum Message {
 pub enum ServerMessage {
     RoomCreated(RoomJoinInfo),
     RoomJoined(RoomJoinInfo),
+    UserJoined(UserJoined),
+    UserLeft(UserLeft),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct UserJoined {
+    pub new_user: Uuid,
+    pub users: Vec<UserMeta>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct UserLeft {
+    pub user_left: Uuid,
+    pub users: Vec<UserMeta>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
