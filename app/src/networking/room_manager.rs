@@ -99,6 +99,10 @@ where
     pub connection: WebsocketContext<Tx>,
     pub socket: StoredValue<Option<WebSocket>>,
     pub ready_state: Signal<ConnectionReadyState>,
+    pub chat_signal: (
+        ReadSignal<Option<(UserMeta, String)>>,
+        WriteSignal<Option<(UserMeta, String)>>,
+    ),
 }
 
 #[derive(Debug, Clone)]
@@ -157,6 +161,7 @@ impl RoomManager {
         room_code: Option<String>,
     ) -> Result<Signal<Option<Message>>, RoomManagerError> {
         with_owner(self.owner, || {
+            let owner = self.owner;
             let is_disconnected = self.state.borrow().is_disconnected();
             if !is_disconnected {
                 return Err(RoomManagerError::AlreadyConnectedToRoom);
@@ -240,6 +245,9 @@ impl RoomManager {
                                                 connection: unsafe { std::ptr::read(connection) },
                                                 socket: socket.clone(),
                                                 ready_state: unsafe { std::ptr::read(ready_state) },
+                                                chat_signal: with_owner(owner, || {
+                                                    create_signal(None)
+                                                }),
                                             };
                                             drop(state_c_ref);
                                             let mut state = state_c.borrow_mut();
@@ -340,6 +348,24 @@ impl RoomManager {
                                         }
                                         player_messages_sender
                                             .set(Some(PlayerMessages::Update(time)));
+                                    }
+                                    common::message::ClientMessage::Chat(message) => {
+                                        if let RoomState::Connected(RoomConnectionInfo {
+                                            chat_signal,
+                                            ..
+                                        }) = &*state_c.borrow()
+                                        {
+                                            if let Some(user) = room_info_reader.with(|r| {
+                                                r.as_ref().and_then(|r| {
+                                                    r.users
+                                                        .iter()
+                                                        .find(|u| u.id == from_user)
+                                                        .cloned()
+                                                })
+                                            }) {
+                                                chat_signal.1.set(Some((user, message)));
+                                            }
+                                        }
                                     }
                                 },
                             }
@@ -443,6 +469,34 @@ impl RoomManager {
                 }
             }
         })
+    }
+
+    pub fn get_chat_signal(&self) -> Option<ReadSignal<Option<(UserMeta, String)>>> {
+        if let RoomState::Connected(RoomConnectionInfo { chat_signal, .. }) = &*self.state.borrow()
+        {
+            Some(chat_signal.0.clone())
+        } else {
+            None
+        }
+    }
+
+    pub fn send_chat(&self, msg: String) {
+        if msg.trim().is_empty() {
+            return;
+        }
+        if let Some(user) = self.room_info_signal.0.with(|r| {
+            r.as_ref()
+                .and_then(|r| r.users.iter().find(|u| u.id == r.user_id).cloned())
+        }) {
+            {
+                if let RoomState::Connected(RoomConnectionInfo { chat_signal, .. }) =
+                    &*self.state.borrow()
+                {
+                    chat_signal.1.set(Some((user, msg.clone())));
+                }
+            }
+            self.send_message(ClientMessage::Chat(msg), SendType::Reliable);
+        }
     }
 }
 

@@ -16,6 +16,7 @@ pub enum ClientMessage {
     Pause(f64),
     Seek(f64),
     Update(f64),
+    Chat(String),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

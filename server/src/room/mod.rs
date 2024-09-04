@@ -71,7 +71,7 @@ pub async fn join_room(
 
     let join_info = app_state
         .rooms
-        .join_room(&join_params.room_id, user)
+        .join_room(&join_params.room_id.to_lowercase(), user)
         .await?;
     let room_id = join_params.room_id;
     if let Some(player_status) = app_state.rooms.get_room_player_status(&room_id).await {
@@ -127,6 +127,9 @@ async fn handle_websocket(
                                                     Message::ClientMessage((sender_id, message)) => {
                                                         if sender_id == &user_id {
                                                             match message {
+                                                                common::message::ClientMessage::Chat(_) => {
+                                                                    app_state.rooms.broadcast_msg_excluding(room_id, original_message, &[user_id]).await;
+                                                                }
                                                                 common::message::ClientMessage::SelectedVideo(video_name) => {
                                                                     app_state.rooms.with_room(room_id, |room|{
                                                                         if let Some(user) = room.users.iter_mut().find(|u|u.meta.id == user_id)
