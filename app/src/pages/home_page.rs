@@ -12,73 +12,96 @@ pub fn HomePage() -> impl IntoView {
     let (join_open, set_join_open) = create_signal(false);
 
     view! {
-        <Dialog is_open=host_open on_close=move|_|{
-            set_host_open.set(false);
-        }>
-            {
-                {
-                    let (name, set_name) = create_signal(String::new());
-                    view! {
-                        <h3 class="font-bold2  text-xl text-center w-full"> "Host" </h3>
-
-                        <div class="h-4" />
-
-                        <div class="flex items-center">
-                            <label class=" font-thin8 text-sm" for="name"> "Name: " </label>
-                            <input class="bg-white/10 focus:outline-white/50  text-md font-thin8 p-2" name="name" type="text" placeholder="Enter your name"
-                                on:input=move|ev| {
-                                    set_name.set(event_target_value(&ev));
-                                }
-                            />
-                        </div>
-
-                        <div class="h-4" />
-
-                        <button class="text-sm hover:bg-white/20 self-center px-4 py-1"
-                            type="button"
-                            on:click=move|_|{
-                                if name.get_untracked().is_empty() {
-                                    // TODO: add toast
-                                    warn!("Name cant be empty");
-                                }else{
-                                    let room_manager = expect_context::<RoomManager>();
-                                    if let Err(err) =  room_manager.host_join(name.get_untracked(), None) {
-                                        warn!("Cannot join {err:#?}");
-                                        //TODO: add toast
-                                    }
-                                }
-                            }
-                        > "[ Create Room ]" </button>
-                    }
-                }
+        <Dialog
+            is_open=host_open
+            on_close=move |_| {
+                set_host_open.set(false);
             }
-        </Dialog>
-
-        <Dialog is_open=join_open on_close=move|_|{
-            set_join_open.set(false);
-        }>
-            {
+        >
+            {{
                 let (name, set_name) = create_signal(String::new());
-                let (room_code, set_room_code) = create_signal(String::new());
-
                 view! {
-                    <h3 class="font-bold2  text-xl text-center w-full"> "Join" </h3>
+                    <h3 class="font-bold2  text-xl text-center w-full">"Host"</h3>
 
                     <div class="h-4" />
 
                     <div class="flex items-center">
-                        <label class=" font-thin8 text-sm" for="name"> "Name: " </label>
-                        <input class="bg-white/10 focus:outline-white/50  text-md font-thin8 p-2" name="name" type="text" placeholder="Enter your name"
-                            on:input=move|ev| {
+                        <label class=" font-thin8 text-sm" for="name">
+                            "Name: "
+                        </label>
+                        <input
+                            class="bg-white/10 focus:outline-white/50  text-md font-thin8 p-2"
+                            name="name"
+                            type="text"
+                            placeholder="Enter your name"
+                            on:input=move |ev| {
+                                set_name.set(event_target_value(&ev));
+                            }
+                        />
+                    </div>
+
+                    <div class="h-4" />
+
+                    <button
+                        class="text-sm hover:bg-white/20 self-center px-4 py-1"
+                        type="button"
+                        on:click=move |_| {
+                            if name.get_untracked().is_empty() {
+                                warn!("Name cant be empty");
+                            } else {
+                                let room_manager = expect_context::<RoomManager>();
+                                if let Err(err) = room_manager.host_join(name.get_untracked(), None)
+                                {
+                                    warn!("Cannot join {err:#?}");
+                                }
+                            }
+                        }
+                    >
+                        "[ Create Room ]"
+                    </button>
+                }
+            }}
+        </Dialog>
+
+        <Dialog
+            is_open=join_open
+            on_close=move |_| {
+                set_join_open.set(false);
+            }
+        >
+            {
+                let (name, set_name) = create_signal(String::new());
+                let (room_code, set_room_code) = create_signal(String::new());
+                view! {
+                    <h3 class="font-bold2  text-xl text-center w-full">"Join"</h3>
+
+                    <div class="h-4" />
+
+                    <div class="flex items-center">
+                        <label class=" font-thin8 text-sm" for="name">
+                            "Name: "
+                        </label>
+                        <input
+                            class="bg-white/10 focus:outline-white/50  text-md font-thin8 p-2"
+                            name="name"
+                            type="text"
+                            placeholder="Enter your name"
+                            on:input=move |ev| {
                                 set_name.set(event_target_value(&ev));
                             }
                         />
                     </div>
 
                     <div class="flex items-center">
-                        <label class=" font-thin8 text-sm" for="roomid"> "Room Id: " </label>
-                        <input class="bg-white/10 focus:outline-white/50  text-md font-thin8 p-2" name="roomid" type="text" placeholder="Room Id"
-                            on:input=move|ev| {
+                        <label class=" font-thin8 text-sm" for="roomid">
+                            "Room Id: "
+                        </label>
+                        <input
+                            class="bg-white/10 focus:outline-white/50  text-md font-thin8 p-2"
+                            name="roomid"
+                            type="text"
+                            placeholder="Room Id"
+                            on:input=move |ev| {
                                 set_room_code.set(event_target_value(&ev));
                             }
                         />
@@ -86,36 +109,47 @@ pub fn HomePage() -> impl IntoView {
 
                     <div class="h-4" />
 
-                    <button class="text-sm hover:bg-white/20 self-center px-4 py-1"
+                    <button
+                        class="text-sm hover:bg-white/20 self-center px-4 py-1"
                         type="button"
-                        on:click=move|_|{
-                            if name.get_untracked().is_empty() || room_code.get_untracked().is_empty() {
-                                // TODO: add toast
+                        on:click=move |_| {
+                            if name.get_untracked().is_empty()
+                                || room_code.get_untracked().is_empty()
+                            {
                                 warn!("Name cant be empty");
-                            }else{
+                            } else {
                                 let room_manager = expect_context::<RoomManager>();
-                                if let Err(err) =  room_manager.host_join(name.get_untracked(), Some(room_code.get_untracked())) {
+                                if let Err(err) = room_manager
+                                    .host_join(
+                                        name.get_untracked(),
+                                        Some(room_code.get_untracked()),
+                                    )
+                                {
                                     warn!("Cannot join {err:#?}");
-                                    //TODO: add toast
                                 }
                             }
                         }
-                    > "[ Join Room ]" </button>
+                    >
+                        "[ Join Room ]"
+                    </button>
                 }
             }
         </Dialog>
         <div class="h-full w-full flex flex-col items-center justify-center ">
-            <h1 class="font-bold2 text-xl"> "Welcome to SyncedCRT" </h1>
+            <h1 class="font-bold2 text-xl">"Welcome to SyncedCRT"</h1>
             <div class="h-4" />
             <div class="flex gap-4">
-                <button class="font-bold1 text-lg"
-                    on:click=move|_|{
+                <button
+                    class="font-bold1 text-lg"
+                    on:click=move |_| {
                         set_host_open.set(true);
                     }
-                > "[ Host ]" </button>
-                <button class="font-bold1 text-lg"
-                    on:click=move|_|set_join_open.set(true)
-                > "[ Join ]" </button>
+                >
+                    "[ Host ]"
+                </button>
+                <button class="font-bold1 text-lg" on:click=move |_| set_join_open.set(true)>
+                    "[ Join ]"
+                </button>
             </div>
 
         </div>

@@ -18,13 +18,37 @@ pub struct User {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum UserState {
+    VideoNotSelected,
+    VideoSelected(String),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PlayerStatus {
+    Paused(f64),
+    Playing(f64),
+}
+
+impl PlayerStatus {
+    /// Returns `true` if the player status is [`Paused`].
+    ///
+    /// [`Paused`]: PlayerStatus::Paused
+    #[must_use]
+    pub fn is_paused(&self) -> bool {
+        matches!(self, Self::Paused(..))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserMeta {
     pub id: Uuid,
     pub name: String,
+    pub state: UserState,
 }
 
 pub struct Room {
     pub users: Vec<User>,
+    pub player_status: PlayerStatus,
 }
 
 #[cfg(feature = "ssr")]
@@ -75,11 +99,14 @@ mod ssr {
                 }
             };
             let user_meta = user.meta.clone();
-            rooms.insert(id.clone(), Room::new(user));
+            let room = Room::new(user);
+            let player_status = room.player_status.clone();
+            rooms.insert(id.clone(), room);
             Ok(RoomJoinInfo {
                 room_id: id,
                 user_id: user_meta.id,
                 users: vec![user_meta],
+                player_status,
             })
         }
 
@@ -96,6 +123,7 @@ mod ssr {
                     room_id: room_id.to_string(),
                     user_id,
                     users: room.users.iter().map(|u| u.meta.clone()).collect(),
+                    player_status: room.player_status.clone(),
                 })
             } else {
                 Err(RoomProviderError::RoomDoesntExist)
@@ -141,11 +169,36 @@ mod ssr {
                 None
             }
         }
+
+        pub async fn get_room_player_status(&self, room_id: &str) -> Option<PlayerStatus> {
+            let rooms = self.rooms.read().await;
+            if let Some(room) = rooms.get(room_id) {
+                Some(room.player_status.clone())
+            } else {
+                None
+            }
+        }
+
+        pub async fn with_room<U>(
+            &self,
+            room_id: &str,
+            f: impl FnOnce(&mut Room) -> U,
+        ) -> Option<U> {
+            let mut rooms = self.rooms.write().await;
+            if let Some(room) = rooms.get_mut(room_id) {
+                Some(f(room))
+            } else {
+                None
+            }
+        }
     }
 
     impl Room {
         pub fn new(user: User) -> Self {
-            Self { users: vec![user] }
+            Self {
+                users: vec![user],
+                player_status: PlayerStatus::Paused(0.0),
+            }
         }
     }
 }

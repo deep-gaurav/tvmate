@@ -7,7 +7,7 @@ use common::{
     message::{Message, RoomJoinInfo, UserJoined, UserLeft},
     message_sender::MessageSender,
     params::{HostParams, JoinParams},
-    RoomProviderError, User, UserMeta,
+    PlayerStatus, RoomProviderError, User, UserMeta, UserState,
 };
 use leptos::logging::warn;
 use serde::{Deserialize, Serialize};
@@ -35,6 +35,7 @@ pub async fn host_room(
         meta: UserMeta {
             id: user_id,
             name: host_params.name,
+            state: common::UserState::VideoNotSelected,
         },
         sender: tx,
     };
@@ -62,6 +63,8 @@ pub async fn join_room(
         meta: UserMeta {
             id: user_id,
             name: join_params.name,
+
+            state: common::UserState::VideoNotSelected,
         },
         sender: tx,
     };
@@ -71,17 +74,20 @@ pub async fn join_room(
         .join_room(&join_params.room_id, user)
         .await?;
     let room_id = join_params.room_id;
-    app_state
-        .rooms
-        .broadcast_msg_excluding(
-            &room_id,
-            Message::ServerMessage(common::message::ServerMessage::UserJoined(UserJoined {
-                new_user: join_info.user_id,
-                users: join_info.users.clone(),
-            })),
-            &[join_info.user_id],
-        )
-        .await;
+    if let Some(player_status) = app_state.rooms.get_room_player_status(&room_id).await {
+        app_state
+            .rooms
+            .broadcast_msg_excluding(
+                &room_id,
+                Message::ServerMessage(common::message::ServerMessage::UserJoined(UserJoined {
+                    new_user: join_info.user_id,
+                    users: join_info.users.clone(),
+                    player_status: player_status,
+                })),
+                &[join_info.user_id],
+            )
+            .await;
+    }
     Ok(ws.on_upgrade(move |mut msgs| async move {
         msgs.send_message(&Message::ServerMessage(
             common::message::ServerMessage::RoomJoined(join_info),
@@ -113,8 +119,47 @@ async fn handle_websocket(
                                     axum::extract::ws::Message::Binary(data) => {
                                         let data = bincode::deserialize::<Message>(&data[..]);
                                         match data {
-                                            Ok(_) => {
-
+                                            Ok(original_message) => {
+                                                match &original_message {
+                                                    Message::ServerMessage(_) => {
+                                                        //ignore
+                                                    },
+                                                    Message::ClientMessage((sender_id, message)) => {
+                                                        if sender_id == &user_id {
+                                                            match message {
+                                                                common::message::ClientMessage::SelectedVideo(video_name) => {
+                                                                    app_state.rooms.with_room(room_id, |room|{
+                                                                        if let Some(user) = room.users.iter_mut().find(|u|u.meta.id == user_id)
+                                                                        {
+                                                                            user.meta.state = UserState::VideoSelected(video_name.clone());
+                                                                        }
+                                                                    }).await;
+                                                                    app_state.rooms.broadcast_msg_excluding(room_id, original_message, &[user_id]).await;
+                                                                },
+                                                                common::message::ClientMessage::Play(val) => {
+                                                                    app_state.rooms.with_room(room_id, |room|{
+                                                                        room.player_status = PlayerStatus::Playing(*val);
+                                                                    }).await;
+                                                                    app_state.rooms.broadcast_msg_excluding(room_id, original_message, &[user_id]).await;
+                                                                },
+                                                                common::message::ClientMessage::Pause(val) => {
+                                                                    app_state.rooms.with_room(room_id, |room|{
+                                                                        room.player_status = PlayerStatus::Paused(*val);
+                                                                    }).await;
+                                                                    app_state.rooms.broadcast_msg_excluding(room_id, original_message, &[user_id]).await;
+                                                                },
+                                                                common::message::ClientMessage::Seek(val) | common::message::ClientMessage::Update(val) => {
+                                                                    app_state.rooms.with_room(room_id, |room|{
+                                                                        match &mut room.player_status {
+                                                                            PlayerStatus::Paused(time) | PlayerStatus::Playing(time) => *time = *val,
+                                                                        }
+                                                                    }).await;
+                                                                    app_state.rooms.broadcast_msg_excluding(room_id, original_message, &[user_id]).await;
+                                                                },
+                                                            }
+                                                        }
+                                                    },
+                                                }
                                             },
                                             Err(err) => {
                                                 warn!("Received msg decode error {err:#?}")
@@ -162,17 +207,20 @@ async fn handle_websocket(
     let remaining_users = app_state.rooms.remove_user(&room_id, user_id).await;
     info!("Disconnected user {user_id}");
     if let Some(users) = remaining_users {
-        app_state
-            .rooms
-            .broadcast_msg_excluding(
-                &room_id,
-                Message::ServerMessage(common::message::ServerMessage::UserLeft(UserLeft {
-                    user_left: user_id,
-                    users,
-                })),
-                &[user_id],
-            )
-            .await;
+        if let Some(player_status) = app_state.rooms.get_room_player_status(room_id).await {
+            app_state
+                .rooms
+                .broadcast_msg_excluding(
+                    &room_id,
+                    Message::ServerMessage(common::message::ServerMessage::UserLeft(UserLeft {
+                        user_left: user_id,
+                        users,
+                        player_status,
+                    })),
+                    &[user_id],
+                )
+                .await;
+        }
     }
 }
 

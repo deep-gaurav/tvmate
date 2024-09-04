@@ -24,3 +24,6 @@ uuid.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 tracing-journald.workspace = true
+
+[features]
+ssr = [] # No user, only here to satisfy rust analyzer
