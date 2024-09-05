@@ -259,7 +259,17 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                     {move || match video_state.get() {
                         VideoState::Playing => "Pause".to_string(),
                         VideoState::Paused => "Play".to_string(),
-                        VideoState::Waiting => "Play".to_string(),
+                        VideoState::Waiting => {
+                            if let Some(video) = video_node.get() {
+                                if video.current_time() == 0.0 {
+                                    "Play"
+                                }else {
+                                    "Waiting"
+                                }
+                            }else{
+                                "Waiting"
+                            }.to_string()
+                        },
                         state => state.to_string(),
                     }}
                 </button>
