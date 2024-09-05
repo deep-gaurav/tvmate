@@ -32,4 +32,7 @@
         "ssr"
     ],
     "rust-analyzer.check.command": "clippy",
+    "github-actions.workflows.pinned.workflows": [
+        ".github/workflows/deploy_bigselfcloud.yml"
+    ],
 }

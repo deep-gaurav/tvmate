@@ -66,7 +66,7 @@ pub fn App() -> impl IntoView {
                 }
             >
                 <div
-                    class="relative aspect-[1042/751] "
+                    class="relative aspect-[1042/751] flex-shrink-0"
                     style=move || { if is_landscape.get() { "height:100%" } else { "width:100%" } }
                 >
                     <div class="h-full w-full absolute bg-cover bg-center bg-no-repeat bg-[url('/assets/images/synced_crt.png')] z-10 pointer-events-none" />
