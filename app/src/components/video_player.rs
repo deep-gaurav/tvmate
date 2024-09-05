@@ -78,31 +78,33 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                     | VideoState::Suspend
                     | VideoState::Seeking => PlayerStatus::Paused(0.0),
                 };
-                match &message {
-                    crate::networking::room_manager::PlayerMessages::Play(time) => {
-                        if player_status.is_paused() {
-                            info!("Received play");
-                            if let Err(err) = video.play() {
-                                video.set_current_time(*time);
-                                warn!("Can not play video {err:#?}")
-                            }
-                        }
-                    }
-                    crate::networking::room_manager::PlayerMessages::Pause(time) => {
-                        if !player_status.is_paused() {
-                            info!("Received pause");
-                            if let Err(err) = video.pause() {
-                                video.set_current_time(*time);
-                                warn!("Can not play video {err:#?}")
-                            }
-                        }
-                    }
-                    crate::networking::room_manager::PlayerMessages::Update(_) => {}
-                    crate::networking::room_manager::PlayerMessages::Seek(time) => {
-                        video.set_current_time(*time);
-                    }
-                }
+
                 if video_state.get_untracked() != VideoState::Seeking {
+                    match &message {
+                        crate::networking::room_manager::PlayerMessages::Play(time) => {
+                            if player_status.is_paused() {
+                                info!("Received play");
+                                if let Err(err) = video.play() {
+                                    video.set_current_time(*time);
+                                    warn!("Can not play video {err:#?}")
+                                }
+                            }
+                        }
+                        crate::networking::room_manager::PlayerMessages::Pause(time) => {
+                            if !player_status.is_paused() {
+                                info!("Received pause");
+                                if let Err(err) = video.pause() {
+                                    video.set_current_time(*time);
+                                    warn!("Can not play video {err:#?}")
+                                }
+                            }
+                        }
+                        crate::networking::room_manager::PlayerMessages::Update(_) => {}
+                        crate::networking::room_manager::PlayerMessages::Seek(time) => {
+                            video.set_current_time(*time);
+                        }
+                    }
+
                     match message {
                         crate::networking::room_manager::PlayerMessages::Play(time)
                         | crate::networking::room_manager::PlayerMessages::Pause(time)
@@ -380,13 +382,15 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                                     video_node.get_untracked(),
                                     duration.get_untracked(),
                                 ) {
-                                    let new_time = (x as f64) / (width as f64) * total;
-                                    video.set_current_time(new_time);
-                                    room_manager_c
-                                        .send_message(
-                                            common::message::ClientMessage::Seek(new_time),
-                                            crate::networking::room_manager::SendType::Reliable,
-                                        );
+                                    if VideoState::Seeking != video_state.get_untracked(){
+                                        let new_time = (x as f64) / (width as f64) * total;
+                                        video.set_current_time(new_time);
+                                        room_manager_c
+                                            .send_message(
+                                                common::message::ClientMessage::Seek(new_time),
+                                                crate::networking::room_manager::SendType::Reliable,
+                                            );
+                                    }
                                 }
                             }
                         }
