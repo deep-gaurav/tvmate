@@ -39,7 +39,7 @@ where
     Connecting(
         (
             WebsocketContext<Tx>,
-            StoredValue<Option<WebSocket>>,
+            Signal<Option<WebSocket>>,
             Signal<ConnectionReadyState>,
         ),
     ),
@@ -88,7 +88,7 @@ where
     Tx: 'static,
 {
     pub connection: WebsocketContext<Tx>,
-    pub socket: StoredValue<Option<WebSocket>>,
+    pub socket: Signal<Option<WebSocket>>,
     pub ready_state: Signal<ConnectionReadyState>,
     pub chat_signal: (
         ReadSignal<Option<(UserMeta, String)>>,
@@ -446,7 +446,7 @@ impl RoomManager {
                             connection.send(Message::ClientMessage((player_id, message)));
                         }
                         SendType::UnReliablle => {
-                            if let Some(socket) = socket.get_value() {
+                            if let Some(socket) = socket.get_untracked() {
                                 if socket.buffered_amount() < 5 {
                                     connection.send(Message::ClientMessage((player_id, message)));
                                 }

@@ -1375,8 +1375,9 @@ dependencies = [
 
 [[package]]
 name = "leptos-use"
-version = "0.13.3"
-source = "git+https://github.com/deep-gaurav/leptos-use.git?branch=fix/return-stored-websocket#36e36ee68cbabfcfae7d8fd3f28d985e7f667800"
+version = "0.13.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "293a4efcd9c2dfc003e6a9ae39763f0d07928a995d531354dbc80276a7e9d53c"
 dependencies = [
  "cfg-if",
  "codee",
