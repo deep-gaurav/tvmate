@@ -62,7 +62,13 @@ futures = "0.3"
 
 [workspace.dependencies.web-sys]
 version = "0.3.70"
-features = ["File", "Blob"]
+features = [
+    "File",
+    "Blob",
+    "Screen",
+    "ScreenOrientation",
+    "OrientationLockType",
+]
 
 # See https://github.com/akesson/cargo-leptos for documentation of all the parameters.
 

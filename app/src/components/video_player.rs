@@ -6,6 +6,7 @@ use leptos_use::{
 use logging::warn;
 use tracing::info;
 use wasm_bindgen::JsCast;
+use web_sys::ScreenOrientation;
 
 use crate::networking::room_manager::RoomManager;
 
@@ -189,7 +190,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
 
     view! {
         <div ref=video_base_ref class="h-full w-full flex flex-col" class=("hidden", move || src.with(|v| v.is_none()))>
-            <div  class="h-full w-full relative" >
+            <div  class="flex-1 overflow-auto w-full relative" >
                 <video
                     ref=video_node
                     class="h-full w-full"
@@ -415,9 +416,18 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                                     if !is_full_screen.get_untracked() {
                                         if let Err(err) = video_base.request_fullscreen(){
                                             warn!("Cannot enter full screen {err:?}")
+                                        }else if let Ok(screen) = window().screen(){
+                                            if let Err(err) = screen.orientation().lock(web_sys::OrientationLockType::Landscape){
+                                                warn!("Cant lock orientation {err:?}")
+                                            }
                                         }
                                     }else{
                                         document().exit_fullscreen();
+                                        if let Ok(screen) = window().screen(){
+                                            if let Err(err) = screen.orientation().unlock(){
+                                                warn!("Cant unlock orientation {err:?}")
+                                            }
+                                        }
                                     }
                                 }
                             }
