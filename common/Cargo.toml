@@ -14,8 +14,9 @@ bincode = { workspace = true }
 
 axum = { workspace = true, optional = true }
 futures = { workspace = true, optional = true }
+unicase = { workspace = true, optional = true }
 
 [features]
 default = []
 hydrate = []
-ssr = ["dep:tokio", "dep:axum", "dep:futures"]
+ssr = ["dep:tokio", "dep:axum", "dep:futures", "dep:unicase"]

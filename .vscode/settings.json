@@ -35,4 +35,5 @@
     "github-actions.workflows.pinned.workflows": [
         ".github/workflows/deploy_bigselfcloud.yml"
     ],
+    "remote.localPortHost": "allInterfaces",
 }

@@ -58,6 +58,7 @@ mod ssr {
     use thiserror::Error;
     use tokio::sync::RwLock;
     use tracing::warn;
+    use unicase::UniCase;
     use util::generate_random_string;
 
     use super::*;
@@ -65,7 +66,7 @@ mod ssr {
 
     #[derive(Clone, Default)]
     pub struct RoomProvider {
-        rooms: Arc<RwLock<HashMap<String, Room>>>,
+        rooms: Arc<RwLock<HashMap<UniCase<String>, Room>>>,
     }
 
     #[derive(Error, Debug)]
@@ -88,7 +89,7 @@ mod ssr {
             let id = {
                 let mut tries = 5;
                 loop {
-                    let id = generate_random_string(6);
+                    let id = UniCase::from(generate_random_string(6));
                     if !rooms.contains_key(&id) {
                         break id;
                     }
@@ -103,7 +104,7 @@ mod ssr {
             let player_status = room.player_status.clone();
             rooms.insert(id.clone(), room);
             Ok(RoomJoinInfo {
-                room_id: id,
+                room_id: id.to_lowercase(),
                 user_id: user_meta.id,
                 users: vec![user_meta],
                 player_status,
@@ -117,7 +118,7 @@ mod ssr {
         ) -> Result<RoomJoinInfo, RoomProviderError> {
             let mut rooms = self.rooms.write().await;
             let user_id = user.meta.id;
-            if let Some(room) = rooms.get_mut(room_id) {
+            if let Some(room) = rooms.get_mut(&UniCase::from(room_id)) {
                 room.users.push(user);
                 Ok(RoomJoinInfo {
                     room_id: room_id.to_string(),
@@ -137,7 +138,7 @@ mod ssr {
             excluded_users: &[Uuid],
         ) {
             let rooms = self.rooms.read().await;
-            if let Some(room) = rooms.get(room_id) {
+            if let Some(room) = rooms.get(&UniCase::from(room_id)) {
                 let send_futures = room
                     .users
                     .iter()
@@ -158,11 +159,11 @@ mod ssr {
 
         pub async fn remove_user(&self, room_id: &str, user_id: Uuid) -> Option<Vec<UserMeta>> {
             let mut rooms = self.rooms.write().await;
-            if let Some(room) = rooms.get_mut(room_id) {
+            if let Some(room) = rooms.get_mut(&UniCase::from(room_id)) {
                 room.users.retain(|user| user.meta.id != user_id);
                 let users = room.users.iter().map(|u| u.meta.clone()).collect();
                 if room.users.is_empty() {
-                    rooms.remove(room_id);
+                    rooms.remove(&UniCase::from(room_id));
                 }
                 Some(users)
             } else {
@@ -172,7 +173,9 @@ mod ssr {
 
         pub async fn get_room_player_status(&self, room_id: &str) -> Option<PlayerStatus> {
             let rooms = self.rooms.read().await;
-            rooms.get(room_id).map(|room| room.player_status.clone())
+            rooms
+                .get(&UniCase::from(room_id))
+                .map(|room| room.player_status.clone())
         }
 
         pub async fn with_room<U>(
@@ -181,7 +184,7 @@ mod ssr {
             f: impl FnOnce(&mut Room) -> U,
         ) -> Option<U> {
             let mut rooms = self.rooms.write().await;
-            rooms.get_mut(room_id).map(f)
+            rooms.get_mut(&UniCase::from(room_id)).map(f)
         }
     }
 

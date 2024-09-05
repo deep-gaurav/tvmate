@@ -445,6 +445,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+ "unicase",
  "uuid",
 ]
 
