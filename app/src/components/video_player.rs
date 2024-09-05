@@ -312,11 +312,11 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                     }
                 }
                 <div
-                    class="absolute h-full w-full top-0 left-0 bg-black/70 opacity-0 hover:opacity-100
+                    class="absolute h-full w-full top-0 left-0 bg-black/70 opacity-0
                     flex flex-col items-center justify-center
                     "
                     class=("opacity-100", is_ui_open)
-                    on:touchend=move |_| {
+                    on:mousemove=move |_| {
                         set_is_ui_open.set(true);
                         stop_close_tiemout();
                         start_close_timeout(());
