@@ -9,7 +9,7 @@ use wasm_bindgen::JsCast;
 
 use crate::networking::room_manager::RoomManager;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum VideoState {
     Playing,
     Paused,
@@ -18,6 +18,7 @@ enum VideoState {
     Errored,
     Stalled,
     Suspend,
+    Seeking,
 }
 
 impl std::fmt::Display for VideoState {
@@ -30,6 +31,7 @@ impl std::fmt::Display for VideoState {
             VideoState::Errored => write!(f, "Errored"),
             VideoState::Stalled => write!(f, "Stalled"),
             VideoState::Suspend => write!(f, "Suspend"),
+            VideoState::Seeking => write!(f, "Seeking"),
         }
     }
 }
@@ -72,7 +74,8 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                     | VideoState::Ended
                     | VideoState::Errored
                     | VideoState::Stalled
-                    | VideoState::Suspend => PlayerStatus::Paused(0.0),
+                    | VideoState::Suspend
+                    | VideoState::Seeking => PlayerStatus::Paused(0.0),
                 };
                 match &message {
                     crate::networking::room_manager::PlayerMessages::Play(time) => {
@@ -98,15 +101,17 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                         video.set_current_time(*time);
                     }
                 }
-                match message {
-                    crate::networking::room_manager::PlayerMessages::Play(time)
-                    | crate::networking::room_manager::PlayerMessages::Pause(time)
-                    | crate::networking::room_manager::PlayerMessages::Update(time)
-                    | crate::networking::room_manager::PlayerMessages::Seek(time) => {
-                        if let Some(current_time) = current_time.get_untracked() {
-                            if ((current_time - time) as f64).abs() > 15.0 {
-                                info!("Time difference big, seeking to time");
-                                video.set_current_time(time);
+                if video_state.get_untracked() != VideoState::Seeking {
+                    match message {
+                        crate::networking::room_manager::PlayerMessages::Play(time)
+                        | crate::networking::room_manager::PlayerMessages::Pause(time)
+                        | crate::networking::room_manager::PlayerMessages::Update(time)
+                        | crate::networking::room_manager::PlayerMessages::Seek(time) => {
+                            if let Some(current_time) = current_time.get_untracked() {
+                                if ((current_time - time) as f64).abs() > 15.0 {
+                                    info!("Time difference big, seeking to time");
+                                    video.set_current_time(time);
+                                }
                             }
                         }
                     }
@@ -125,25 +130,28 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
             | VideoState::Ended
             | VideoState::Errored
             | VideoState::Stalled
-            | VideoState::Suspend => PlayerStatus::Paused(time),
+            | VideoState::Suspend
+            | VideoState::Seeking => PlayerStatus::Paused(time),
         };
-        if let Some(room_player_status) = room_manager.get_player_status() {
-            if room_player_status.is_paused() != player_status.is_paused() {
-                room_manager.set_player_status(player_status.clone());
-                match player_status {
-                    PlayerStatus::Paused(time) => {
-                        info!("Sending pause");
-                        room_manager.send_message(
-                            common::message::ClientMessage::Pause(time),
-                            crate::networking::room_manager::SendType::Reliable,
-                        );
-                    }
-                    PlayerStatus::Playing(time) => {
-                        info!("Sending play");
-                        room_manager.send_message(
-                            common::message::ClientMessage::Play(time),
-                            crate::networking::room_manager::SendType::Reliable,
-                        );
+        if video_state != VideoState::Seeking {
+            if let Some(room_player_status) = room_manager.get_player_status() {
+                if room_player_status.is_paused() != player_status.is_paused() {
+                    room_manager.set_player_status(player_status.clone());
+                    match player_status {
+                        PlayerStatus::Paused(time) => {
+                            info!("Sending pause");
+                            room_manager.send_message(
+                                common::message::ClientMessage::Pause(time),
+                                crate::networking::room_manager::SendType::Reliable,
+                            );
+                        }
+                        PlayerStatus::Playing(time) => {
+                            info!("Sending play");
+                            room_manager.send_message(
+                                common::message::ClientMessage::Play(time),
+                                crate::networking::room_manager::SendType::Reliable,
+                            );
+                        }
                     }
                 }
             }
@@ -213,6 +221,9 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                     on:stalled=move |_| { set_video_state.set(VideoState::Stalled) }
                     on:suspend=move |_| { set_video_state.set(VideoState::Suspend) }
                     on:waiting=move |_| { set_video_state.set(VideoState::Waiting) }
+                    on:seeking=move |_| {
+                        set_video_state.set(VideoState::Seeking)
+                    }
                     on:seeked=move |_| {
                         if let Some(video) = video_node.get() {
                             if video.paused() {
