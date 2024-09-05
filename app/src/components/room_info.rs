@@ -18,10 +18,10 @@ pub fn RoomInfo() -> impl IntoView {
                 view! {
                     <Portal
                         mount=element
-                        class="h-full w-full bg-black text-white flex flex-col justify-stretch items-center"
+                        class="h-full w-full bg-black text-white flex flex-col justify-stretch items-center overflow-auto"
                     >
                         <div class="text-xs font-thin8 text-center">"Room"</div>
-                        <div>
+                        <div class="break-words">
                             {move || match room_info
                                 .with(|r| r.as_ref().map(|r| r.id.to_uppercase()))
                             {
@@ -38,7 +38,7 @@ pub fn RoomInfo() -> impl IntoView {
                                 .into_iter()
                                 .map(|user| {
                                     view! {
-                                        <div class="text-left w-full mt-2">
+                                        <div class="text-left w-full mt-2 break-words">
                                             "> " {user.name}
                                             {match user.state {
                                                 common::UserState::VideoNotSelected => "⌛",
