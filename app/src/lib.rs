@@ -49,6 +49,8 @@ pub fn App() -> impl IntoView {
         // sets the document title
         <Title text="Welcome to SyncedCRT" />
 
+        <Meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
+
         // content for this welcome page
         <Router fallback=|| {
             let mut outside_errors = Errors::default();
