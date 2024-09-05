@@ -63,7 +63,7 @@ mod ssr {
     use super::*;
     use std::{collections::HashMap, sync::Arc};
 
-    #[derive(Clone)]
+    #[derive(Clone, Default)]
     pub struct RoomProvider {
         rooms: Arc<RwLock<HashMap<String, Room>>>,
     }
@@ -116,7 +116,7 @@ mod ssr {
             user: User,
         ) -> Result<RoomJoinInfo, RoomProviderError> {
             let mut rooms = self.rooms.write().await;
-            let user_id = user.meta.id.clone();
+            let user_id = user.meta.id;
             if let Some(room) = rooms.get_mut(room_id) {
                 room.users.push(user);
                 Ok(RoomJoinInfo {
@@ -172,11 +172,7 @@ mod ssr {
 
         pub async fn get_room_player_status(&self, room_id: &str) -> Option<PlayerStatus> {
             let rooms = self.rooms.read().await;
-            if let Some(room) = rooms.get(room_id) {
-                Some(room.player_status.clone())
-            } else {
-                None
-            }
+            rooms.get(room_id).map(|room| room.player_status.clone())
         }
 
         pub async fn with_room<U>(
@@ -185,11 +181,7 @@ mod ssr {
             f: impl FnOnce(&mut Room) -> U,
         ) -> Option<U> {
             let mut rooms = self.rooms.write().await;
-            if let Some(room) = rooms.get_mut(room_id) {
-                Some(f(room))
-            } else {
-                None
-            }
+            rooms.get_mut(room_id).map(f)
         }
     }
 

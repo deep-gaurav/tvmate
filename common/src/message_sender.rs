@@ -3,8 +3,10 @@ use tracing::warn;
 use crate::message::Message;
 
 pub trait MessageSender {
+    #[allow(async_fn_in_trait)]
     async fn send_binary(&mut self, data: Vec<u8>);
 
+    #[allow(async_fn_in_trait)]
     async fn send_message(&mut self, message: &Message) {
         let data = bincode::serialize(message);
         match data {

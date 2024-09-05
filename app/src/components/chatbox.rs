@@ -1,4 +1,3 @@
-
 use leptos::*;
 use tracing::info;
 
@@ -26,7 +25,6 @@ pub fn ChatBox() -> impl IntoView {
     view! {
         {
             move || {
-                    let message_history = message_history.clone();
                     let mount_points = expect_context::<MountPoints>();
                     let el = mount_points.side_point.get();
                     if let Some(el) = el {

@@ -1,8 +1,4 @@
-use std::{
-    cell::RefCell,
-    marker::PhantomData,
-    rc::Rc,
-};
+use std::{cell::RefCell, marker::PhantomData, rc::Rc};
 
 use codee::binary::BincodeSerdeCodec;
 use common::{
@@ -12,20 +8,17 @@ use common::{
     PlayerStatus, UserMeta, UserState,
 };
 use leptos::{
-    create_effect, create_signal, logging::warn, with_owner, Owner, ReadSignal,
-    Signal, SignalGet, SignalGetUntracked, SignalSet, SignalWith, SignalWithUntracked, StoredValue,
-    WriteSignal,
+    create_effect, create_signal, logging::warn, with_owner, Owner, ReadSignal, Signal, SignalGet,
+    SignalGetUntracked, SignalSet, SignalWith, SignalWithUntracked, StoredValue, WriteSignal,
 };
 use leptos_router::use_navigate;
 use leptos_use::{
-    core::ConnectionReadyState, use_websocket_with_options, UseWebSocketOptions,
-    UseWebSocketReturn,
+    core::ConnectionReadyState, use_websocket_with_options, UseWebSocketOptions, UseWebSocketReturn,
 };
 use thiserror::Error;
 use tracing::info;
 use uuid::Uuid;
 use web_sys::WebSocket;
-
 
 #[derive(Clone)]
 pub struct RoomManager {
@@ -185,19 +178,17 @@ impl RoomManager {
                         message,
                         ready_state,
                         ws,
-                        
                         ..
                     } = use_websocket_with_options::<Message, Message, BincodeSerdeCodec>(
                         &format!("{url}?{params}"),
                         UseWebSocketOptions::default()
                             .reconnect_limit(leptos_use::ReconnectLimit::Limited(0)),
                     );
-                    let messages_c = message.clone();
                     let state_c = self.state.clone();
                     let state_c1 = self.state.clone();
                     let room_info_reader = self.room_info_signal.0;
                     let room_info_writer = self.room_info_signal.1;
-                    let player_messages_sender = self.player_message_tx.1.clone();
+                    let player_messages_sender = self.player_message_tx.1;
                     create_effect(move |_| {
                         let ws_state = ready_state.get();
                         info!("WS State change {:#?}", ws_state);
@@ -219,7 +210,7 @@ impl RoomManager {
                         }
                     });
                     create_effect(move |_| {
-                        let message = messages_c.get();
+                        let message = message.get();
                         if let Some(message) = message {
                             match message {
                                 Message::ServerMessage(message) => match message {
@@ -235,13 +226,13 @@ impl RoomManager {
                                         {
                                             let room_info = RoomInfo {
                                                 id: room_info.room_id.clone(),
-                                                user_id: room_info.user_id.clone(),
+                                                user_id: room_info.user_id,
                                                 users: room_info.users,
                                                 player_status: room_info.player_status,
                                             };
                                             let connection_info = RoomConnectionInfo {
                                                 connection: unsafe { std::ptr::read(connection) },
-                                                socket: socket.clone(),
+                                                socket: *socket,
                                                 ready_state: unsafe { std::ptr::read(ready_state) },
                                                 chat_signal: with_owner(owner, || {
                                                     create_signal(None)
@@ -382,7 +373,7 @@ impl RoomManager {
                     });
                     let mut state = self.state.borrow_mut();
                     *state = RoomState::Connecting((
-                        WebsocketContext::new(message.clone(), message_sender_tx),
+                        WebsocketContext::new(message, message_sender_tx),
                         ws,
                         ready_state,
                     ));
@@ -401,9 +392,9 @@ impl RoomManager {
         let val = self.state.borrow();
         match &*val {
             RoomState::Disconnected => Err(RoomManagerError::NotConnectedToRoom),
-            RoomState::Connecting((connection, _, _)) => Ok(connection.message.clone()),
+            RoomState::Connecting((connection, _, _)) => Ok(connection.message),
 
-            RoomState::Connected(room_info) => Ok(room_info.connection.message.clone()),
+            RoomState::Connected(room_info) => Ok(room_info.connection.message),
         }
     }
 
@@ -472,7 +463,7 @@ impl RoomManager {
     pub fn get_chat_signal(&self) -> Option<ReadSignal<Option<(UserMeta, String)>>> {
         if let RoomState::Connected(RoomConnectionInfo { chat_signal, .. }) = &*self.state.borrow()
         {
-            Some(chat_signal.0.clone())
+            Some(chat_signal.0)
         } else {
             None
         }

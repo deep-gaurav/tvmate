@@ -1,2 +1,2 @@
-pub static HOST_ROOM: &'static str = "/hoost-room/ws";
-pub static JOIN_ROOM: &'static str = "/join-room/ws";
+pub static HOST_ROOM: &str = "/hoost-room/ws";
+pub static JOIN_ROOM: &str = "/join-room/ws";

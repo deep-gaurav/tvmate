@@ -99,7 +99,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                     | crate::networking::room_manager::PlayerMessages::Update(time)
                     | crate::networking::room_manager::PlayerMessages::Seek(time) => {
                         if let Some(current_time) = current_time.get_untracked() {
-                            if ((current_time as f64) - time).abs() > 15.0 {
+                            if ((current_time - time) as f64).abs() > 15.0 {
                                 info!("Time difference big, seeking to time");
                                 video.set_current_time(time);
                             }

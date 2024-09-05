@@ -31,4 +31,5 @@
     "rust-analyzer.cargo.features": [
         "ssr"
     ],
+    "rust-analyzer.check.command": "clippy",
 }

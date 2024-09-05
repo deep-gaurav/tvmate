@@ -81,7 +81,7 @@ pub async fn join_room(
                 Message::ServerMessage(common::message::ServerMessage::UserJoined(UserJoined {
                     new_user: join_info.user_id,
                     users: join_info.users.clone(),
-                    player_status: player_status,
+                    player_status,
                 })),
                 &[join_info.user_id],
             )
@@ -206,14 +206,14 @@ async fn handle_websocket(
             }
         }
     }
-    let remaining_users = app_state.rooms.remove_user(&room_id, user_id).await;
+    let remaining_users = app_state.rooms.remove_user(room_id, user_id).await;
     info!("Disconnected user {user_id}");
     if let Some(users) = remaining_users {
         if let Some(player_status) = app_state.rooms.get_room_player_status(room_id).await {
             app_state
                 .rooms
                 .broadcast_msg_excluding(
-                    &room_id,
+                    room_id,
                     Message::ServerMessage(common::message::ServerMessage::UserLeft(UserLeft {
                         user_left: user_id,
                         users,
