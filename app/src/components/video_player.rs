@@ -1,6 +1,8 @@
 use common::PlayerStatus;
 use leptos::*;
-use leptos_use::{use_throttle_fn_with_arg, use_timeout_fn, UseTimeoutFnReturn};
+use leptos_use::{
+    use_event_listener, use_throttle_fn_with_arg, use_timeout_fn, UseTimeoutFnReturn,
+};
 use logging::warn;
 use tracing::info;
 use wasm_bindgen::JsCast;
@@ -57,6 +59,9 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
     let room_manager_c = room_manager.clone();
 
     let player_messages_receiver = room_manager.get_player_messages();
+
+    let (is_full_screen, set_is_full_screen) = create_signal(false);
+
     create_effect(move |_| {
         if let Some(video) = video_node.get() {
             if let Some(message) = player_messages_receiver.get() {
@@ -163,8 +168,16 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
         }
     });
 
+    let video_base_ref = create_node_ref::<leptos::html::Div>();
+    create_effect(move |_| {
+        let _ = use_event_listener(document(), leptos::ev::fullscreenchange, move |_| {
+            info!("Fullschreen changed");
+            set_is_full_screen.set(document().fullscreen_element().is_some());
+        });
+    });
+
     view! {
-        <div class="h-full w-full relative" class=("hidden", move || src.with(|v| v.is_none()))>
+        <div ref=video_base_ref class="h-full w-full relative" class=("hidden", move || src.with(|v| v.is_none()))>
             <video
                 ref=video_node
                 class="h-full w-full"
@@ -318,8 +331,26 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                             }
                         }
                     />
+
                 </div>
 
+                <div
+                    class="absolute top-[85%] left-[5%]"
+                >
+                    <button
+                        on:click=move|_|{
+                            if let Some(video_base) = video_base_ref.get_untracked(){
+                                if !is_full_screen.get_untracked() {
+                                    if let Err(err) = video_base.request_fullscreen(){
+                                        warn!("Cannot enter full screen {err:?}")
+                                    }
+                                }else{
+                                    document().exit_fullscreen();
+                                }
+                            }
+                        }
+                    > "[ Full Screen ]" </button>
+                </div>
             </div>
         </div>
     }

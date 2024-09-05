@@ -8,8 +8,9 @@ use common::{
     PlayerStatus, UserMeta, UserState,
 };
 use leptos::{
-    create_effect, create_signal, logging::warn, with_owner, Owner, ReadSignal, Signal, SignalGet,
-    SignalGetUntracked, SignalSet, SignalWith, SignalWithUntracked, StoredValue, WriteSignal,
+    create_effect, create_signal, logging::warn, store_value, with_owner, Owner, ReadSignal,
+    Signal, SignalGet, SignalGetUntracked, SignalSet, SignalWith, SignalWithUntracked, StoredValue,
+    WriteSignal,
 };
 use leptos_router::use_navigate;
 use leptos_use::{
@@ -90,6 +91,7 @@ where
     pub connection: WebsocketContext<Tx>,
     pub socket: Signal<Option<WebSocket>>,
     pub ready_state: Signal<ConnectionReadyState>,
+    pub chat_history: StoredValue<Vec<(UserMeta, String)>>,
     pub chat_signal: (
         ReadSignal<Option<(UserMeta, String)>>,
         WriteSignal<Option<(UserMeta, String)>>,
@@ -230,13 +232,26 @@ impl RoomManager {
                                                 users: room_info.users,
                                                 player_status: room_info.player_status,
                                             };
+
+                                            let chat_signal =
+                                                with_owner(owner, || create_signal(None));
+                                            let chat_history =
+                                                with_owner(owner, || store_value(Vec::new()));
+
+                                            with_owner(owner, || {
+                                                create_effect(move |_| {
+                                                    if let Some(msg) = chat_signal.0.get() {
+                                                        chat_history.update_value(|v| v.push(msg));
+                                                    }
+                                                })
+                                            });
+
                                             let connection_info = RoomConnectionInfo {
                                                 connection: unsafe { std::ptr::read(connection) },
                                                 socket: *socket,
                                                 ready_state: unsafe { std::ptr::read(ready_state) },
-                                                chat_signal: with_owner(owner, || {
-                                                    create_signal(None)
-                                                }),
+                                                chat_signal,
+                                                chat_history,
                                             };
                                             drop(state_c_ref);
                                             let mut state = state_c.borrow_mut();
@@ -460,10 +475,19 @@ impl RoomManager {
         })
     }
 
-    pub fn get_chat_signal(&self) -> Option<ReadSignal<Option<(UserMeta, String)>>> {
-        if let RoomState::Connected(RoomConnectionInfo { chat_signal, .. }) = &*self.state.borrow()
+    pub fn get_chat_signal(
+        &self,
+    ) -> Option<(
+        ReadSignal<Option<(UserMeta, String)>>,
+        StoredValue<Vec<(UserMeta, String)>>,
+    )> {
+        if let RoomState::Connected(RoomConnectionInfo {
+            chat_history,
+            chat_signal,
+            ..
+        }) = &*self.state.borrow()
         {
-            Some(chat_signal.0)
+            Some((chat_signal.0, *chat_history))
         } else {
             None
         }
