@@ -1,5 +1,4 @@
 use leptos::*;
-use tracing::info;
 
 use crate::components::portal::Portal;
 use crate::networking::room_manager::RoomManager;

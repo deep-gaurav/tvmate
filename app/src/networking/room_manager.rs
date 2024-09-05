@@ -1,8 +1,7 @@
 use std::{
-    cell::{Ref, RefCell},
+    cell::RefCell,
     marker::PhantomData,
     rc::Rc,
-    sync::mpsc,
 };
 
 use codee::binary::BincodeSerdeCodec;
@@ -13,21 +12,20 @@ use common::{
     PlayerStatus, UserMeta, UserState,
 };
 use leptos::{
-    create_effect, create_signal, logging::warn, store_value, with_owner, Owner, ReadSignal,
+    create_effect, create_signal, logging::warn, with_owner, Owner, ReadSignal,
     Signal, SignalGet, SignalGetUntracked, SignalSet, SignalWith, SignalWithUntracked, StoredValue,
     WriteSignal,
 };
 use leptos_router::use_navigate;
 use leptos_use::{
-    core::ConnectionReadyState, use_websocket, use_websocket_with_options, UseWebSocketOptions,
+    core::ConnectionReadyState, use_websocket_with_options, UseWebSocketOptions,
     UseWebSocketReturn,
 };
 use thiserror::Error;
-use tracing::{debug, info};
+use tracing::info;
 use uuid::Uuid;
 use web_sys::WebSocket;
 
-use crate::components::room_info;
 
 #[derive(Clone)]
 pub struct RoomManager {
@@ -187,7 +185,7 @@ impl RoomManager {
                         message,
                         ready_state,
                         ws,
-                        close,
+                        
                         ..
                     } = use_websocket_with_options::<Message, Message, BincodeSerdeCodec>(
                         &format!("{url}?{params}"),

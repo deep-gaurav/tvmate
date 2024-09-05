@@ -3,7 +3,7 @@ use axum::{
     body::Body,
     extract::{FromRef, Request, State},
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::get,
     Router,
 };
 use common::{endpoints, RoomProvider};

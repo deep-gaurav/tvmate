@@ -1,10 +1,6 @@
-use core::time;
-
 use common::PlayerStatus;
 use leptos::*;
-use leptos_use::{
-    use_interval_fn, use_throttle_fn, use_throttle_fn_with_arg, use_timeout_fn, UseTimeoutFnReturn,
-};
+use leptos_use::{use_throttle_fn_with_arg, use_timeout_fn, UseTimeoutFnReturn};
 use logging::warn;
 use tracing::info;
 use wasm_bindgen::JsCast;

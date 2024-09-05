@@ -4,13 +4,12 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use common::{
-    message::{Message, RoomJoinInfo, UserJoined, UserLeft},
+    message::{Message, UserJoined, UserLeft},
     message_sender::MessageSender,
     params::{HostParams, JoinParams},
     PlayerStatus, RoomProviderError, User, UserMeta, UserState,
 };
 use leptos::logging::warn;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::info;
 use uuid::Uuid;

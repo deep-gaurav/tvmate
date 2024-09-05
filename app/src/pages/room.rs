@@ -1,4 +1,3 @@
-use std::ops::Deref;
 
 use leptos::*;
 use leptos_meta::Title;
@@ -8,10 +7,9 @@ use wasm_bindgen::{JsCast, UnwrapThrowExt};
 
 use crate::{
     components::{
-        chatbox::ChatBox, portal::Portal, room_info::RoomInfo, video_player::VideoPlayer,
+        chatbox::ChatBox, room_info::RoomInfo, video_player::VideoPlayer,
     },
     networking::room_manager::RoomManager,
-    MountPoints,
 };
 
 #[derive(Params, PartialEq, Clone)]
