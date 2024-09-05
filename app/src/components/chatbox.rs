@@ -37,11 +37,11 @@ pub fn ChatBox() -> impl IntoView {
                                     <div class="text-center w-full"> "Chat" </div>
                                     // <hr class="border-white border-t w-full" />
     
-                                    <div class="flex-grow overflow-auto h-full w-full">
+                                    <div class="flex-grow overflow-auto h-full w-full flex flex-col-reverse">
                                         <For
                                             each=move||{
                                                 let len =msg_len.get();
-                                                0..len
+                                                (0..len).rev()
                                             }
                                             key=|i|*i
                                             children = move|i|{
