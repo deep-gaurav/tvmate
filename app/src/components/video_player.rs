@@ -169,10 +169,22 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                 ref=video_node
                 class="h-full w-full"
                 on:canplay=move |_| {
-                    set_video_state.set(VideoState::Paused);
+                    if let Some(video) = video_node.get_untracked(){
+                        if video.paused(){
+                            set_video_state.set(VideoState::Paused);
+                        }else{
+                            set_video_state.set(VideoState::Playing);
+                        }
+                    }
                 }
                 on:canplaythrough=move |_| {
-                    set_video_state.set(VideoState::Paused);
+                    if let Some(video) = video_node.get_untracked(){
+                        if video.paused(){
+                            set_video_state.set(VideoState::Paused);
+                        }else{
+                            set_video_state.set(VideoState::Playing);
+                        }
+                    }
                 }
                 on:ended=move |_| {
                     set_video_state.set(VideoState::Ended);
