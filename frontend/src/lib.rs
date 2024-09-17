@@ -20,6 +20,13 @@ pub fn hydrate() {
         // a runtime error.
         .without_time()
         .init();
-
-    leptos::mount_to_body(App);
+    let endpoint = Endpoint {
+        main_endpoint: std::borrow::Cow::Borrowed(""),
+    };
+    leptos::mount_to_body(|| {
+        provide_context(endpoint);
+        view! {
+            <App/>
+        }
+    });
 }

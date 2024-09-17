@@ -1,0 +1,66 @@
+html,
+body {
+	width: 100%;
+	height: 100%;
+	height: 100dvh;
+
+	font-size: 8px;
+
+	@media screen and (min-width: 350px) {
+		font-size: 9px;
+	}
+
+	@media screen and (min-width: 450px) {
+		font-size: 12px;
+	}
+
+	@media screen and (min-width: 600px) {
+		font-size: 14px;
+	}
+
+
+	@media screen and (min-width: 800px) {
+		font-size: 16px;
+	}
+}
+
+
+@font-face {
+	font-family: 'Compaq2x';
+	src: url('/assets/fonts/Web437_Compaq_Port3-2x.woff') format('woff');
+	font-weight: normal;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Compaq1x';
+	src: url('/assets/fonts/Web437_Compaq_Port3.woff') format('woff');
+	font-weight: normal;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'CompaqThin8';
+	src: url('/assets/fonts/Web437_CompaqThin_8x8.woff') format('woff');
+	font-weight: normal;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'CompaqThin14';
+	src: url('/assets/fonts/Web437_CompaqThin_8x14.woff') format('woff');
+	font-weight: normal;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'CompaqThin16';
+	src: url('/assets/fonts/Web437_CompaqThin_8x16.woff') format('woff');
+	font-weight: normal;
+	font-style: normal;
+	font-display: swap;
+}

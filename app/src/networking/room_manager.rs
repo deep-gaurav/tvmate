@@ -8,9 +8,9 @@ use common::{
     PlayerStatus, UserMeta, UserState,
 };
 use leptos::{
-    create_effect, create_signal, logging::warn, store_value, with_owner, Owner, ReadSignal,
-    Signal, SignalGet, SignalGetUntracked, SignalSet, SignalWith, SignalWithUntracked, StoredValue,
-    WriteSignal,
+    create_effect, create_signal, expect_context, logging::warn, store_value, with_owner, Owner,
+    ReadSignal, Signal, SignalGet, SignalGetUntracked, SignalSet, SignalWith, SignalWithUntracked,
+    StoredValue, WriteSignal,
 };
 use leptos_router::use_navigate;
 use leptos_use::{
@@ -20,6 +20,8 @@ use thiserror::Error;
 use tracing::info;
 use uuid::Uuid;
 use web_sys::WebSocket;
+
+use crate::Endpoint;
 
 #[derive(Clone)]
 pub struct RoomManager {
@@ -173,6 +175,7 @@ impl RoomManager {
                     serde_urlencoded::to_string(&host_params)
                 }
             };
+            let main_endpoint = expect_context::<Endpoint>().main_endpoint;
             match params {
                 Ok(params) => {
                     let UseWebSocketReturn {
@@ -182,7 +185,7 @@ impl RoomManager {
                         ws,
                         ..
                     } = use_websocket_with_options::<Message, Message, BincodeSerdeCodec>(
-                        &format!("{url}?{params}"),
+                        &format!("{main_endpoint}{url}?{params}"),
                         UseWebSocketOptions::default()
                             .reconnect_limit(leptos_use::ReconnectLimit::Limited(0)),
                     );

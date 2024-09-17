@@ -1,5 +1,8 @@
+use std::borrow::Cow;
+
 use crate::error_template::{AppError, ErrorTemplate};
 
+use cfg_if::cfg_if;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
@@ -18,6 +21,11 @@ pub mod pages;
 pub struct MountPoints {
     pub handle_point: NodeRef<leptos::html::Div>,
     pub side_point: NodeRef<leptos::html::Div>,
+}
+
+#[derive(Clone)]
+pub struct Endpoint {
+    pub main_endpoint: Cow<'static, str>,
 }
 
 #[component]
@@ -44,7 +52,14 @@ pub fn App() -> impl IntoView {
     let is_landscape = create_memo(move |_| width.get() / height.get() > 1042.0 / 751.0);
 
     view! {
-        <Stylesheet id="leptos" href="/pkg/tvmate.css" />
+
+        {
+            cfg_if! { if #[cfg(not(feature="csr"))] {
+                view!{
+                    <Stylesheet id="leptos" href="/pkg/tvmate.css" />
+                }
+            }}
+        }
 
         // sets the document title
         <Title text="Welcome to TVMate" />
