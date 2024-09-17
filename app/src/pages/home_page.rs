@@ -136,7 +136,7 @@ pub fn HomePage() -> impl IntoView {
             }
         </Dialog>
         <div class="h-full w-full flex flex-col items-center justify-center ">
-            <h1 class="font-bold2 text-xl">"Welcome to SyncedCRT"</h1>
+            <h1 class="font-bold2 text-xl">"Welcome to TVMate"</h1>
             <div class="h-4" />
             <div class="flex gap-4">
                 <button

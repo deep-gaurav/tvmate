@@ -44,10 +44,10 @@ pub fn App() -> impl IntoView {
     let is_landscape = create_memo(move |_| width.get() / height.get() > 1042.0 / 751.0);
 
     view! {
-        <Stylesheet id="leptos" href="/pkg/syncedcrt.css" />
+        <Stylesheet id="leptos" href="/pkg/tvmate.css" />
 
         // sets the document title
-        <Title text="Welcome to SyncedCRT" />
+        <Title text="Welcome to TVMate" />
 
         <Meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
 
