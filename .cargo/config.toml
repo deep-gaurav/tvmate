@@ -1,5 +1,5 @@
-[unstable]
-codegen-backend = true
+# [unstable]
+# codegen-backend = true
 
 [build]
 rustflags = ["-Z", "threads=12"]
@@ -9,7 +9,7 @@ rustflags = ["-Z", "threads=12"]
 # rustflags = ["-C", "link-arg=-fuse-ld=/usr/bin/mold"]
 
 [profile.bindev]
-codegen-backend = "cranelift"
+# codegen-backend = "cranelift"
 
 [target.x86_64-unknown-linux-musl]
 # linker = "x86_64-linux-musl-gcc"
