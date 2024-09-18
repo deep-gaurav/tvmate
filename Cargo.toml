@@ -2,14 +2,7 @@
 
 [workspace]
 resolver = "2"
-members = [
-    "app",
-    "common",
-    "frontend",
-    "server",
-    "tauri_app",
-    "tauri_app/src-tauri",
-]
+members = ["app", "common", "frontend", "server", "tauri", "tauri/src-tauri"]
 
 # need to be applied only to wasm build
 [profile.release]
