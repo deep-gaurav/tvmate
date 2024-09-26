@@ -22,6 +22,7 @@ pub fn HomePage() -> impl IntoView {
             window(),
             ev::Custom::new("beforeinstallprompt"),
             move |ev: Event| {
+                ev.prevent_default();
                 info!("Before install prompt fired");
                 set_install_prompt.set(Some(ev));
             },
