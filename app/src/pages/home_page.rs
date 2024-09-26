@@ -1,6 +1,11 @@
+use ev::Event;
 use leptos::component;
 use leptos::*;
+use leptos_use::use_event_listener;
 use logging::warn;
+use tracing::info;
+use wasm_bindgen::{JsCast, JsValue};
+use web_sys::js_sys;
 
 use crate::components::dialog::Dialog;
 use crate::networking::room_manager::RoomManager;
@@ -10,6 +15,18 @@ use crate::networking::room_manager::RoomManager;
 pub fn HomePage() -> impl IntoView {
     let (host_open, set_host_open) = create_signal(false);
     let (join_open, set_join_open) = create_signal(false);
+
+    let (install_prompt, set_install_prompt) = create_signal(None);
+    create_effect(move |_| {
+        let _ = use_event_listener(
+            window(),
+            ev::Custom::new("beforeinstallprompt"),
+            move |ev: Event| {
+                info!("Before install prompt fired");
+                set_install_prompt.set(Some(ev));
+            },
+        );
+    });
 
     view! {
         <Dialog
@@ -136,6 +153,8 @@ pub fn HomePage() -> impl IntoView {
             }
         </Dialog>
         <div class="h-full w-full flex flex-col items-center justify-center ">
+
+            <div class="flex-grow" />
             <h1 class="font-bold2 text-xl">"Welcome to TVMate"</h1>
             <div class="h-4" />
             <div class="flex gap-4">
@@ -151,7 +170,27 @@ pub fn HomePage() -> impl IntoView {
                     "[ Join ]"
                 </button>
             </div>
+            <div class="flex-grow"/>
 
+            {
+                move|| if let Some(prompt_event) = install_prompt.get() {
+                    view! {
+                        <button class="font-bold1 text-sm" on:click=move |_| {
+                            let _ = js_sys::Reflect::get(&prompt_event, &JsValue::from_str("prompt"))
+                            .expect("Failed to get 'prompt' property")
+                            .dyn_ref::<js_sys::Function>()
+                            .expect("'prompt' is not a function")
+                            .call0(&prompt_event)
+                            .expect("Failed to call 'prompt' function");
+                        }>
+                            "[ Install Web App ]"
+                        </button>
+                        <div class="h-4" />
+                    }.into_view()
+                }else{
+                    view! {}.into_view()
+                }
+            }
         </div>
     }
 }

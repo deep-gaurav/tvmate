@@ -66,6 +66,8 @@ pub fn App() -> impl IntoView {
 
         <Meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
 
+        <Link rel="manifest" href="manifest.json" />
+
         // content for this welcome page
         <Router fallback=|| {
             let mut outside_errors = Errors::default();

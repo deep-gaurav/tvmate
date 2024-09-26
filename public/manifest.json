@@ -1,0 +1,13 @@
+{
+    "name": "TVMate",
+    "start_url": "./",
+    "icons": [
+        {
+            "sizes": "310x310",
+            "src": "./Square310x310Logo.png",
+            "type": "image/png"
+        }
+    ],
+    "//display": "standalone",
+    "display": "fullscreen"
+}
