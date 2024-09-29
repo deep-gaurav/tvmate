@@ -17,6 +17,10 @@ pub enum ClientMessage {
     Seek(f64),
     Update(f64),
     Chat(String),
+    // RequestRTCCreds,
+    SendSessionDesc(Uuid, RTCSessionDesc),
+    ReceivedSessionDesc(RTCSessionDesc),
+    ExchangeCandidate(Uuid, String),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -25,6 +29,7 @@ pub enum ServerMessage {
     RoomJoined(RoomJoinInfo),
     UserJoined(UserJoined),
     UserLeft(UserLeft),
+    // RtcConfig(RtcConfig),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -47,4 +52,19 @@ pub struct RoomJoinInfo {
     pub user_id: Uuid,
     pub users: Vec<UserMeta>,
     pub player_status: PlayerStatus,
+    pub rtc_config: RtcConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RtcConfig {
+    pub stun: String,
+    pub turn: String,
+    pub turn_user: String,
+    pub turn_creds: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RTCSessionDesc {
+    pub typ: String,
+    pub sdp: String,
 }

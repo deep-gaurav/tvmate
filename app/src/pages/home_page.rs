@@ -171,27 +171,34 @@ pub fn HomePage() -> impl IntoView {
                     "[ Join ]"
                 </button>
             </div>
-            <div class="flex-grow"/>
+            <div class="flex-grow" />
 
-            {
-                move|| if let Some(prompt_event) = install_prompt.get() {
+            {move || {
+                if let Some(prompt_event) = install_prompt.get() {
                     view! {
-                        <button class="font-bold1 text-sm" on:click=move |_| {
-                            let _ = js_sys::Reflect::get(&prompt_event, &JsValue::from_str("prompt"))
-                            .expect("Failed to get 'prompt' property")
-                            .dyn_ref::<js_sys::Function>()
-                            .expect("'prompt' is not a function")
-                            .call0(&prompt_event)
-                            .expect("Failed to call 'prompt' function");
-                        }>
+                        <button
+                            class="font-bold1 text-sm"
+                            on:click=move |_| {
+                                let _ = js_sys::Reflect::get(
+                                        &prompt_event,
+                                        &JsValue::from_str("prompt"),
+                                    )
+                                    .expect("Failed to get 'prompt' property")
+                                    .dyn_ref::<js_sys::Function>()
+                                    .expect("'prompt' is not a function")
+                                    .call0(&prompt_event)
+                                    .expect("Failed to call 'prompt' function");
+                            }
+                        >
                             "[ Install Web App ]"
                         </button>
                         <div class="h-4" />
-                    }.into_view()
-                }else{
+                    }
+                        .into_view()
+                } else {
                     view! {}.into_view()
                 }
-            }
+            }}
         </div>
     }
 }

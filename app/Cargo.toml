@@ -26,6 +26,10 @@ uuid.workspace = true
 wasm-bindgen.workspace = true
 web-sys.workspace = true
 
+serde.workspace = true
+
+wasm-bindgen-futures.workspace = true
+
 [features]
 default = []
 hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]

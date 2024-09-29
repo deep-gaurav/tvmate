@@ -8,8 +8,6 @@ fn main() {
     };
     mount_to_body(|| {
         provide_context(endpoint);
-        view! {
-            <App/>
-        }
+        view! { <App /> }
     })
 }

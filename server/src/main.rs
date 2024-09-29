@@ -29,6 +29,7 @@ pub struct AppState {
 
 #[tokio::main]
 async fn main() {
+    let _ = dotenvy::dotenv();
     let subscriber = tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
         .with(

@@ -16,7 +16,20 @@ axum = { workspace = true, optional = true }
 futures = { workspace = true, optional = true }
 unicase = { workspace = true, optional = true }
 
+
+hmac = { workspace = true, optional = true }
+sha1 = { workspace = true, optional = true }
+base64 = { workspace = true, optional = true }
+
 [features]
 default = []
 hydrate = []
-ssr = ["dep:tokio", "dep:axum", "dep:futures", "dep:unicase"]
+ssr = [
+    "dep:tokio",
+    "dep:axum",
+    "dep:futures",
+    "dep:unicase",
+    "dep:hmac",
+    "dep:sha1",
+    "dep:base64",
+]

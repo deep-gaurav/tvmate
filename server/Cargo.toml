@@ -25,5 +25,7 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 tracing-journald.workspace = true
 
+dotenvy.workspace = true
+
 [features]
 ssr = [] # No user, only here to satisfy rust analyzer

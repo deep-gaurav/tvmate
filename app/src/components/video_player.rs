@@ -191,25 +191,29 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
     let (chat_msg, set_chat_msg) = create_signal(String::new());
 
     view! {
-        <div ref=video_base_ref class="h-full w-full flex flex-col" class=("hidden", move || src.with(|v| v.is_none()))>
-            <div  class="flex-1 overflow-auto w-full relative" >
+        <div
+            ref=video_base_ref
+            class="h-full w-full flex flex-col"
+            class=("hidden", move || src.with(|v| v.is_none()))
+        >
+            <div class="flex-1 overflow-auto w-full relative">
                 <video
                     ref=video_node
                     class="h-full w-full"
                     on:canplay=move |_| {
-                        if let Some(video) = video_node.get_untracked(){
-                            if video.paused(){
+                        if let Some(video) = video_node.get_untracked() {
+                            if video.paused() {
                                 set_video_state.set(VideoState::Paused);
-                            }else{
+                            } else {
                                 set_video_state.set(VideoState::Playing);
                             }
                         }
                     }
                     on:canplaythrough=move |_| {
-                        if let Some(video) = video_node.get_untracked(){
-                            if video.paused(){
+                        if let Some(video) = video_node.get_untracked() {
+                            if video.paused() {
                                 set_video_state.set(VideoState::Paused);
-                            }else{
+                            } else {
                                 set_video_state.set(VideoState::Playing);
                             }
                         }
@@ -224,14 +228,12 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                     on:stalled=move |_| { set_video_state.set(VideoState::Stalled) }
                     on:suspend=move |_| { set_video_state.set(VideoState::Suspend) }
                     on:waiting=move |_| { set_video_state.set(VideoState::Waiting) }
-                    on:seeking=move |_| {
-                        set_video_state.set(VideoState::Seeking)
-                    }
+                    on:seeking=move |_| { set_video_state.set(VideoState::Seeking) }
                     on:seeked=move |_| {
                         if let Some(video) = video_node.get() {
                             if video.paused() {
                                 set_video_state.set(VideoState::Paused)
-                            }else{
+                            } else {
                                 set_video_state.set(VideoState::Playing)
                             }
                         }
@@ -257,62 +259,62 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                     }}
                 </video>
 
+                {if let Some((message_signal, message_history)) = expect_context::<RoomManager>()
+                    .get_chat_signal()
                 {
-                    if let Some((message_signal, message_history)) = expect_context::<RoomManager>().get_chat_signal() {
-                        let (msg_len, set_msg_len) = create_signal(message_history.with_value(|v| v.len()));
-
-                        let (is_visible, set_is_visible) = create_signal(false);
-
-                        let UseTimeoutFnReturn {
-                            start: start_visible_timeout,
-                            stop: stop_visible_tiemout,
-                            ..
-                        } = use_timeout_fn(
-                            move |_| {
-                                set_is_visible.set(false);
-                            },
-                            5000.0,
-                        );
-
-                        create_effect(move |_| {
-                            message_signal.with(|_|());
-                            set_msg_len.set(message_history.with_value(|v| v.len()));
-                            set_is_visible.set(true);
-                            stop_visible_tiemout();
-                            start_visible_timeout(());
-                        });
-                        view! {
-                            <div class="absolute w-[20%] overflow-auto break-words right-0 top-[35%] h-[30%] flex flex-col-reverse"
-                                class=("hidden", move || !(is_full_screen.get() && is_visible.get()))
-                            >
-                                <For
-                                    each=move||{
-                                        let len =msg_len.get();
-                                        (0..len).rev()
-                                    }
-                                    key=|i|*i
-                                    children = move|i|{
-                                        let msg = message_history.with_value(|v|v.get(i).cloned());
-                                        if let Some((user,msg)) = msg {
-                                            view! {
-                                                <div class="w-full text-md font-thin14 [text-shadow:_0_1px_0_rgb(0_0_0_/_40%)]">
-                                                    <span class="font-thin8 text-sm"> {user.name} ": " </span>
-                                                    <span>
-                                                        {msg}
-                                                    </span>
-                                                </div>
-                                            }.into_view()
-                                        }else{
-                                            view! {}.into_view()
+                    let (msg_len, set_msg_len) = create_signal(
+                        message_history.with_value(|v| v.len()),
+                    );
+                    let (is_visible, set_is_visible) = create_signal(false);
+                    let UseTimeoutFnReturn {
+                        start: start_visible_timeout,
+                        stop: stop_visible_tiemout,
+                        ..
+                    } = use_timeout_fn(
+                        move |_| {
+                            set_is_visible.set(false);
+                        },
+                        5000.0,
+                    );
+                    create_effect(move |_| {
+                        message_signal.with(|_| ());
+                        set_msg_len.set(message_history.with_value(|v| v.len()));
+                        set_is_visible.set(true);
+                        stop_visible_tiemout();
+                        start_visible_timeout(());
+                    });
+                    view! {
+                        <div
+                            class="absolute w-[20%] overflow-auto break-words right-0 top-[35%] h-[30%] flex flex-col-reverse"
+                            class=("hidden", move || !(is_full_screen.get() && is_visible.get()))
+                        >
+                            <For
+                                each=move || {
+                                    let len = msg_len.get();
+                                    (0..len).rev()
+                                }
+                                key=|i| *i
+                                children=move |i| {
+                                    let msg = message_history.with_value(|v| v.get(i).cloned());
+                                    if let Some((user, msg)) = msg {
+                                        view! {
+                                            <div class="w-full text-md font-thin14 [text-shadow:_0_1px_0_rgb(0_0_0_/_40%)]">
+                                                <span class="font-thin8 text-sm">{user.name} ": "</span>
+                                                <span>{msg}</span>
+                                            </div>
                                         }
+                                            .into_view()
+                                    } else {
+                                        view! {}.into_view()
                                     }
-                                />
-                            </div>
-                        }.into_view()
-                    }else {
-                        view! {}.into_view()
+                                }
+                            />
+                        </div>
                     }
-                }
+                        .into_view()
+                } else {
+                    view! {}.into_view()
+                }}
                 <div
                     class="absolute h-full w-full top-0 left-0 bg-black/70 opacity-0
                     flex flex-col items-center justify-center
@@ -357,15 +359,12 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                             VideoState::Paused => "Play".to_string(),
                             VideoState::Waiting => {
                                 if let Some(video) = video_node.get() {
-                                    if video.current_time() == 0.0 {
-                                        "Play"
-                                    }else {
-                                        "Waiting"
-                                    }
-                                }else{
+                                    if video.current_time() == 0.0 { "Play" } else { "Waiting" }
+                                } else {
                                     "Waiting"
-                                }.to_string()
-                            },
+                                }
+                                    .to_string()
+                            }
                             state => state.to_string(),
                         }}
                     </button>
@@ -382,7 +381,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                                     video_node.get_untracked(),
                                     duration.get_untracked(),
                                 ) {
-                                    if VideoState::Seeking != video_state.get_untracked(){
+                                    if VideoState::Seeking != video_state.get_untracked() {
                                         let new_time = (x as f64) / (width as f64) * total;
                                         video.set_current_time(new_time);
                                         room_manager_c
@@ -411,51 +410,50 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
 
                     </div>
 
-                    <div
-                        class="absolute top-[85%] left-[5%]"
-                    >
-                        <button
-                            on:click=move|_|{
-                                if let Some(video_base) = video_base_ref.get_untracked(){
-                                    if !is_full_screen.get_untracked() {
-                                        if let Err(err) = video_base.request_fullscreen(){
-                                            warn!("Cannot enter full screen {err:?}")
-                                        }else if let Ok(screen) = window().screen(){
-                                            if let Err(err) = screen.orientation().lock(web_sys::OrientationLockType::Landscape){
-                                                warn!("Cant lock orientation {err:?}")
-                                            }
+                    <div class="absolute top-[85%] left-[5%]">
+                        <button on:click=move |_| {
+                            if let Some(video_base) = video_base_ref.get_untracked() {
+                                if !is_full_screen.get_untracked() {
+                                    if let Err(err) = video_base.request_fullscreen() {
+                                        warn!("Cannot enter full screen {err:?}")
+                                    } else if let Ok(screen) = window().screen() {
+                                        if let Err(err) = screen
+                                            .orientation()
+                                            .lock(web_sys::OrientationLockType::Landscape)
+                                        {
+                                            warn!("Cant lock orientation {err:?}")
                                         }
-                                    }else{
-                                        document().exit_fullscreen();
-                                        if let Ok(screen) = window().screen(){
-                                            if let Err(err) = screen.orientation().unlock(){
-                                                warn!("Cant unlock orientation {err:?}")
-                                            }
+                                    }
+                                } else {
+                                    document().exit_fullscreen();
+                                    if let Ok(screen) = window().screen() {
+                                        if let Err(err) = screen.orientation().unlock() {
+                                            warn!("Cant unlock orientation {err:?}")
                                         }
                                     }
                                 }
                             }
-                        > "[ Full Screen ]" </button>
+                        }>"[ Full Screen ]"</button>
                     </div>
                 </div>
 
-
             </div>
 
-            <form class="w-full flex"
-                class=("hidden", move|| !is_full_screen.get())
-                on:submit=move|ev|{
+            <form
+                class="w-full flex"
+                class=("hidden", move || !is_full_screen.get())
+                on:submit=move |ev| {
                     ev.prevent_default();
                     let rm = expect_context::<RoomManager>();
                     rm.send_chat(chat_msg.get_untracked());
                     set_chat_msg.set(String::new());
                 }
             >
-                <input class="w-full text-md font-thin16 p-2 bg-transparent text-white" placeholder="Enter msg to chat"
-                    on:input=move|ev| {
-                        set_chat_msg.set(event_target_value(&ev))
-                    }
-                    on:keyup=move|ev| {
+                <input
+                    class="w-full text-md font-thin16 p-2 bg-transparent text-white"
+                    placeholder="Enter msg to chat"
+                    on:input=move |ev| { set_chat_msg.set(event_target_value(&ev)) }
+                    on:keyup=move |ev| {
                         if ev.key_code() == 13 || ev.key() == "Enter" {
                             let rm = expect_context::<RoomManager>();
                             rm.send_chat(chat_msg.get_untracked());
@@ -464,10 +462,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                     }
                     prop:value=chat_msg
                 />
-                <button class="p-2 border text-md font-thin14 "
-                >
-                    "Submit"
-                </button>
+                <button class="p-2 border text-md font-thin14 ">"Submit"</button>
             </form>
         </div>
     }

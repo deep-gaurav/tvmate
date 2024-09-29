@@ -25,8 +25,6 @@ pub fn hydrate() {
     };
     leptos::mount_to_body(|| {
         provide_context(endpoint);
-        view! {
-            <App/>
-        }
+        view! { <App /> }
     });
 }

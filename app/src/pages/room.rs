@@ -39,18 +39,17 @@ pub fn RoomPage() -> impl IntoView {
                     view! {
                         <Title text=format!("Room {room_id}") />
                         <VideoPlayer src=video_url />
-                        {
-                            move || {
-                                if is_csr.get(){
-                                    view! {
-                                        <RoomInfo />
-                                        <ChatBox />
-                                    }.into_view()
-                                }else {
-                                    view! {}.into_view()
+                        {move || {
+                            if is_csr.get() {
+                                view! {
+                                    <RoomInfo />
+                                    <ChatBox />
                                 }
+                                    .into_view()
+                            } else {
+                                view! {}.into_view()
                             }
-                        }
+                        }}
                         <div
                             class="h-full w-full flex px-10 py-4 items-center justify-center flex-col"
                             class=("hidden", move || video_url.with(|v| v.is_some()))

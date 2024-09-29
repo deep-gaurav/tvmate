@@ -4,7 +4,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use common::{
-    message::{Message, UserJoined, UserLeft},
+    message::{ClientMessage, Message, UserJoined, UserLeft},
     message_sender::MessageSender,
     params::{HostParams, JoinParams},
     PlayerStatus, RoomProviderError, User, UserMeta, UserState,
@@ -38,8 +38,15 @@ pub async fn host_room(
         },
         sender: tx,
     };
-    let room_id = app_state.rooms.new_room(user).await?;
+    let room_id = app_state.rooms.new_room(user).await;
 
+    let room_id = match room_id {
+        Ok(r) => r,
+        Err(er) => {
+            warn!("Failed to create room {er:?}");
+            return Err(er.into());
+        }
+    };
     Ok(ws.on_upgrade(move |mut msgs| async move {
         msgs.send_message(&Message::ServerMessage(
             common::message::ServerMessage::RoomCreated(room_id.clone()),
@@ -130,7 +137,7 @@ async fn handle_websocket(
                                                                     app_state.rooms.broadcast_msg_excluding(room_id, original_message, &[user_id]).await;
                                                                 }
                                                                 common::message::ClientMessage::SelectedVideo(video_name) => {
-                                                                    app_state.rooms.with_room(room_id, |room|{
+                                                                    app_state.rooms.with_room_mut(room_id, |room|{
                                                                         if let Some(user) = room.users.iter_mut().find(|u|u.meta.id == user_id)
                                                                         {
                                                                             user.meta.state = UserState::VideoSelected(video_name.clone());
@@ -139,24 +146,53 @@ async fn handle_websocket(
                                                                     app_state.rooms.broadcast_msg_excluding(room_id, original_message, &[user_id]).await;
                                                                 },
                                                                 common::message::ClientMessage::Play(val) => {
-                                                                    app_state.rooms.with_room(room_id, |room|{
+                                                                    app_state.rooms.with_room_mut(room_id, |room|{
                                                                         room.player_status = PlayerStatus::Playing(*val);
                                                                     }).await;
                                                                     app_state.rooms.broadcast_msg_excluding(room_id, original_message, &[user_id]).await;
                                                                 },
                                                                 common::message::ClientMessage::Pause(val) => {
-                                                                    app_state.rooms.with_room(room_id, |room|{
+                                                                    app_state.rooms.with_room_mut(room_id, |room|{
                                                                         room.player_status = PlayerStatus::Paused(*val);
                                                                     }).await;
                                                                     app_state.rooms.broadcast_msg_excluding(room_id, original_message, &[user_id]).await;
                                                                 },
                                                                 common::message::ClientMessage::Seek(val) | common::message::ClientMessage::Update(val) => {
-                                                                    app_state.rooms.with_room(room_id, |room|{
+                                                                    app_state.rooms.with_room_mut(room_id, |room|{
                                                                         match &mut room.player_status {
                                                                             PlayerStatus::Paused(time) | PlayerStatus::Playing(time) => *time = *val,
                                                                         }
                                                                     }).await;
                                                                     app_state.rooms.broadcast_msg_excluding(room_id, original_message, &[user_id]).await;
+                                                                },
+                                                                common::message::ClientMessage::SendSessionDesc(uuid, rtcsession_desc) => {
+                                                                    info!("Sending description from {sender_id} to {uuid}");
+                                                                    let sender = app_state.rooms.with_room(room_id, |room| {
+                                                                        room.users.iter().find(|user|user.meta.id == *uuid).map(|user| user.sender.clone())
+                                                                    }).await.flatten();
+                                                                    if let Some(sender) = sender {
+                                                                        if let Err(err) = sender.send(Message::ClientMessage((*sender_id, ClientMessage::ReceivedSessionDesc(rtcsession_desc.clone())))).await{
+                                                                            warn!("Failed send session desc {err:?}");
+                                                                        }
+                                                                        info!("sent description from {sender_id} to {uuid}");
+
+                                                                    }else{
+                                                                        warn!("User {uuid} not found");
+                                                                    }
+                                                                },
+
+                                                                common::message::ClientMessage::ExchangeCandidate(uuid, candidate) => {
+                                                                    let sender = app_state.rooms.with_room(room_id, |room| {
+                                                                        room.users.iter().find(|user|user.meta.id == *uuid).map(|user| user.sender.clone())
+                                                                    }).await.flatten();
+                                                                    if let Some(sender) = sender {
+                                                                        if let Err(err) = sender.send(Message::ClientMessage((*sender_id, ClientMessage::ExchangeCandidate(*sender_id,candidate.clone())))).await{
+                                                                            warn!("Failed send session desc {err:?}");
+                                                                        }
+                                                                    }
+                                                                },
+                                                                common::message::ClientMessage::ReceivedSessionDesc(rtcsession_desc) => {
+                                                                    warn!("Shouldnt receive received desc");
                                                                 },
                                                             }
                                                         }
@@ -230,7 +266,10 @@ impl IntoResponse for RoomJoinError {
     fn into_response(self) -> Response {
         match self {
             RoomJoinError::RoomProviderError(err) => match err {
-                RoomProviderError::KeyGenerationFailed => {
+                RoomProviderError::KeyGenerationFailed
+                | RoomProviderError::RTCConfigGenerationFailed(_)
+                | RoomProviderError::TimeError(_)
+                | RoomProviderError::HmacError(_) => {
                     (StatusCode::INTERNAL_SERVER_ERROR, format!("{err:#?}")).into_response()
                 }
                 RoomProviderError::RoomDoesntExist => {

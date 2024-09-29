@@ -1,9 +1,9 @@
-use std::{cell::RefCell, marker::PhantomData, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, marker::PhantomData, rc::Rc};
 
 use codee::binary::BincodeSerdeCodec;
 use common::{
     endpoints,
-    message::{ClientMessage, Message, UserJoined, UserLeft},
+    message::{ClientMessage, Message, RTCSessionDesc, RtcConfig, UserJoined, UserLeft},
     params::{HostParams, JoinParams},
     PlayerStatus, UserMeta, UserState,
 };
@@ -14,14 +14,21 @@ use leptos::{
 };
 use leptos_router::use_navigate;
 use leptos_use::{
-    core::ConnectionReadyState, use_websocket_with_options, UseWebSocketOptions, UseWebSocketReturn,
+    core::ConnectionReadyState, use_event_listener, use_websocket_with_options,
+    UseWebSocketOptions, UseWebSocketReturn,
 };
 use thiserror::Error;
 use tracing::info;
 use uuid::Uuid;
-use web_sys::WebSocket;
+use wasm_bindgen::{JsCast, JsValue};
+use web_sys::{
+    MediaStream, RtcIceCandidateInit, RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType, RtcSessionDescriptionInit, RtcTrackEvent, WebSocket
+};
 
-use crate::Endpoint;
+use crate::{
+    networking::rtc_connect::{add_audio_tracks, connect_rtc, deserialize_candidate, serialize_candidate},
+    Endpoint,
+};
 
 #[derive(Clone)]
 pub struct RoomManager {
@@ -30,6 +37,10 @@ pub struct RoomManager {
     player_message_tx: (
         ReadSignal<Option<PlayerMessages>>,
         WriteSignal<Option<PlayerMessages>>,
+    ),
+    pub audio_chat_stream_signal: (
+        ReadSignal<Option<(Uuid, MediaStream)>>,
+        WriteSignal<Option<(Uuid, MediaStream)>>,
     ),
     owner: Owner,
 }
@@ -98,6 +109,10 @@ where
         ReadSignal<Option<(UserMeta, String)>>,
         WriteSignal<Option<(UserMeta, String)>>,
     ),
+    pub rtc_config: StoredValue<RtcConfig>,
+    pub rtc_peers: StoredValue<HashMap<Uuid, RtcPeerConnection>>,
+    pub rtc_pending_ice: StoredValue<HashMap<Uuid, Vec<RtcIceCandidateInit>>>,
+    
 }
 
 #[derive(Debug, Clone)]
@@ -138,6 +153,7 @@ impl RoomManager {
             state: Rc::new(RefCell::new(RoomState::Disconnected)),
             room_info_signal: create_signal(None),
             player_message_tx: create_signal(None),
+            audio_chat_stream_signal: create_signal(None),
             owner,
         }
     }
@@ -214,6 +230,10 @@ impl RoomManager {
                             }
                         }
                     });
+                    let rm = self.clone();
+
+                    let audio_stream_setter = self.audio_chat_stream_signal.1;
+
                     create_effect(move |_| {
                         let message = message.get();
                         if let Some(message) = message {
@@ -229,6 +249,9 @@ impl RoomManager {
                                             ready_state,
                                         )) = &*state_c_ref
                                         {
+                                            let rtc_config = with_owner(owner, ||{
+                                                store_value(room_info.rtc_config)
+                                            });
                                             let room_info = RoomInfo {
                                                 id: room_info.room_id.clone(),
                                                 user_id: room_info.user_id,
@@ -249,12 +272,23 @@ impl RoomManager {
                                                 })
                                             });
 
+                                            let pcs = with_owner(owner, ||{
+                                                store_value(HashMap::new())
+                                            });
+
+                                            let ice = with_owner(owner, ||{
+                                                store_value(HashMap::new())
+                                            });
+
                                             let connection_info = RoomConnectionInfo {
                                                 connection: unsafe { std::ptr::read(connection) },
                                                 socket: *socket,
                                                 ready_state: unsafe { std::ptr::read(ready_state) },
                                                 chat_signal,
                                                 chat_history,
+                                                rtc_peers: pcs,
+                                                rtc_config,
+                                                rtc_pending_ice: ice
                                             };
                                             drop(state_c_ref);
                                             let mut state = state_c.borrow_mut();
@@ -371,6 +405,187 @@ impl RoomManager {
                                                 })
                                             }) {
                                                 chat_signal.1.set(Some((user, message)));
+                                            }
+                                        }
+                                    }
+                                    ClientMessage::SendSessionDesc(_uuid, _rtcsession_desc) => {
+                                        warn!("Received send session description")
+                                    }
+                                    ClientMessage::ReceivedSessionDesc(rtcsession_desc) => {
+                                        info!("Received desc {rtcsession_desc:?}");
+                                        if let RoomState::Connected(RoomConnectionInfo {
+                                            rtc_config,
+                                            rtc_peers,
+                                            rtc_pending_ice,
+                                            ..
+                                        }) = &*state_c.borrow()
+                                        {
+                                            let rtc_pending_ice = *rtc_pending_ice;
+                                            if let Some(rtc_sdp) = RtcSdpType::from_js_value(
+                                                &JsValue::from_str(&rtcsession_desc.typ),
+                                            ) {
+                                                let rtc_sdp =
+                                                    RtcSessionDescriptionInit::new(rtc_sdp);
+                                                rtc_sdp.set_sdp(&rtcsession_desc.sdp);
+                                                if let Some(pc) = rtc_peers.with_value(|peers| {
+                                                    peers.get(&from_user).cloned()
+                                                }) {
+
+                                                    info!("PC exists, setting remote answer");
+                                                    leptos::spawn_local(async move {
+                                                        if let Err(err) = wasm_bindgen_futures::JsFuture::from(pc.set_remote_description(&rtc_sdp)).await{
+                                                            warn!("Cannot set answer {err:?}");
+                                                        }
+                                                    });
+                                                } else {
+                                                    
+                                                    info!("pc not exists, create pc");
+                                                    let pc = rtc_config.with_value(|config| {
+                                                        info!("Connect with creds {config:?}");
+
+                                                        connect_rtc(
+                                                            &config.stun,
+                                                            &config.turn,
+                                                            &config.turn_user,
+                                                            &config.turn_creds,
+                                                        )
+                                                    });
+
+                                                    if let Ok(pc) = pc {
+                                                        with_owner(owner, || {
+                                                            let _ = use_event_listener(
+                                                                pc.clone(),
+                                                                leptos::ev::Custom::<
+                                                                    RtcPeerConnectionIceEvent,
+                                                                >::new(
+                                                                    "icecandidate"
+                                                                ),
+                                                                {
+    
+                                                                    let rm = rm.clone();
+                                                                    move |ev| {
+    
+                                                                        if let Some(candidate) =
+                                                                            ev.candidate()
+                                                                        {
+                                                                            info!("new pc ice received sending");
+    
+                                                                            if let Ok(candidate) = serialize_candidate(candidate) {
+                                                                                rm.send_message(ClientMessage::ExchangeCandidate(from_user, candidate), SendType::Reliable);
+                                                                            }else{
+                                                                                warn!("Cant serialize candidate")
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                },
+                                                            );
+                                                        });
+
+                                                        let _ = with_owner(owner, ||{
+                                                            use_event_listener(
+                                                                pc.clone(),
+                                                                leptos::ev::Custom::<
+                                                                    RtcTrackEvent,
+                                                                >::new(
+                                                                    "track"
+                                                                ),
+                                                                
+                                                                    move |ev| {
+                                                                        
+                                                                        info!("new pc tracks received");
+                                                                        info!("Received track from rtc streams len {}", ev.streams().length());
+                                                                        if let Some(stream) = ev.streams().get(0).dyn_ref::<MediaStream>() {
+                                                                            audio_stream_setter.set(Some((from_user, stream.clone())));
+                                                                        }
+                                                                    }
+                                                                ,
+                                                            )
+                                                        });
+                                                        let peers = *rtc_peers;
+                                                        let rm = rm.clone();
+                                                        leptos::spawn_local(async move {
+                                                            match add_audio_tracks(&pc).await {
+                                                                Ok(_) => {
+                                                                    
+                                                                info!("new pc tracks added");
+                                        
+
+                                                                    
+                                                                info!("new pc add offer");
+                                                                    if let Err(err) =  wasm_bindgen_futures::JsFuture::from(pc.set_remote_description(&rtc_sdp)).await {
+                                                                        warn!("Caanot set remote {err:?}");
+                                                                        return;
+                                                                    }
+                                                                    
+                                                                info!("new pc offer added, get asnwer");
+                                                                    let answer = match wasm_bindgen_futures::JsFuture::from(pc.create_answer()).await {
+                                                                        Ok(answer) => answer.unchecked_into::<RtcSessionDescriptionInit>(),
+                                                                        Err(err) => {
+                                                                            warn!("Failed to create answer {err:?}");
+                                                                            return;
+                                                                        }
+                                                                    };
+                                                                    
+                                                                info!("new pc set local");
+                                                                    if let Err(err) = wasm_bindgen_futures::JsFuture::from(pc.set_local_description(&answer)).await {
+                                                                        warn!("Local answer set failed {err:?}");
+                                                                    }
+
+                                                                    peers.update_value(|peers| {
+                                                                        peers.insert(from_user, pc.clone());
+                                                                    });
+
+                                                                let pending_ices =  rtc_pending_ice.with_value(|ice| {
+                                                                    ice.get(&from_user).cloned()
+                                                                });
+                                                                if let Some(pending_ices) = pending_ices {
+                                                                    rtc_pending_ice.update_value(|ice| {
+                                                                        ice.remove(&from_user);
+                                                                    });
+                                                                    for pending_ice in pending_ices {
+                                                                        let _ = pc.add_ice_candidate_with_opt_rtc_ice_candidate_init(Some(&pending_ice));
+                                                                    }
+                                                                }
+                                                                info!("new pc send answer");
+                                                                    rm.send_message(ClientMessage::SendSessionDesc(from_user, RTCSessionDesc{
+                                                                        typ: JsValue::from(answer.get_type()).as_string().expect("sdp type not string"),
+                                                                        sdp: answer.get_sdp().expect("No sdp")
+                                                                    }), SendType::Reliable);
+                                                                },
+                                                                Err(err) => warn!("Cannot add tracks to pc {err:?}"),
+                                                            }
+                                                        });
+                                                    } else {
+                                                        warn!("PC Create failed {pc:?}")
+                                                    }
+                                                }
+                                            }else {
+                                                warn!("RtcSdpType not valid")
+                                            }
+                                        }else {
+                                            warn!("Received desc but not connected")
+                                        }
+                                    }
+                                    ClientMessage::ExchangeCandidate(_, candidate) => {
+                                        if let RoomState::Connected(RoomConnectionInfo {
+                                            rtc_peers,
+                                            rtc_pending_ice,
+                                            ..
+                                        }) = &*state_c.borrow()
+                                        {
+                                            if let Ok(candidate) = deserialize_candidate(&candidate){
+                                                if let Some(pc) = rtc_peers
+                                                .with_value(|peers| peers.get(&from_user).cloned())
+                                                {
+                                                    let _ = pc.add_ice_candidate_with_opt_rtc_ice_candidate_init(Some(&candidate));
+                                                }else{
+                                                    rtc_pending_ice.update_value(|ice| {
+                                                        let ice_queue = ice.entry(from_user).or_default();
+                                                        ice_queue.push(candidate);
+                                                    });
+                                                }
+                                            }else{
+                                                warn!("Cant deserialize candidate")
                                             }
                                         }
                                     }
@@ -512,6 +727,118 @@ impl RoomManager {
                 }
             }
             self.send_message(ClientMessage::Chat(msg), SendType::Reliable);
+        }
+    }
+
+    pub async fn connect_audio_chat(&self, user: Uuid) {
+        let rtc_config_peer =  if let RoomState::Connected(RoomConnectionInfo {
+            rtc_config,
+            rtc_peers,            ..
+        }) = &*self.state.borrow() {
+            Some((*rtc_config, *rtc_peers))
+        }else{
+            None
+        };
+
+        
+
+        if let Some((rtc_config, rtc_peers)) = rtc_config_peer
+        {
+            
+            let pc = rtc_config.with_value(|config| {
+                info!("Connect with creds {config:?}");
+
+                connect_rtc(
+                    &config.stun,
+                    &config.turn,
+                    &config.turn_user,
+                    &config.turn_creds,
+                )
+            });
+            let rm = self.clone();
+            if let Ok(pc) = pc {
+                
+                info!("Host pc created");
+                let _ = use_event_listener(
+                    pc.clone(),
+                    leptos::ev::Custom::<
+                        RtcPeerConnectionIceEvent,
+                    >::new(
+                        "icecandidate"
+                    ),
+                    {
+                        
+                        let rm = rm.clone();
+                        move |ev| {
+                            if let Some(candidate) =
+                                ev.candidate()
+                            {
+                                info!("Host received ice sending");
+
+                                if let Ok(candidate) = serialize_candidate(candidate) {
+                                    rm.send_message(ClientMessage::ExchangeCandidate(user, candidate), SendType::Reliable);
+                                }else{
+                                    warn!("Cant serialize candidate")
+                                }
+                            }
+                        }
+                    },
+                );
+
+                
+                let _ = use_event_listener(
+                    pc.clone(),
+                    leptos::ev::Custom::<
+                        RtcTrackEvent,
+                    >::new(
+                        "track"
+                    ),
+                    
+                        {
+                            let sender = self.audio_chat_stream_signal.1;
+
+                            move |ev| {
+                                info!("Host received tracks");
+                                info!("Received track from rtc streams len {}", ev.streams().length());
+                                // Currently we only have 1 audio stream
+                                if let Some(stream) = ev.streams().get(0).dyn_ref::<MediaStream>() {
+                                sender.set(Some((user,stream.clone())));
+                            }
+                        }}
+                    ,
+                );
+                let peers = rtc_peers;
+
+                match add_audio_tracks(&pc).await {
+                    Ok(_) => {
+                        info!("Host added tracks");
+
+                        peers.update_value(|peers| {
+                            peers.insert(user, pc.clone());
+                        });
+                       
+                        let offer = match wasm_bindgen_futures::JsFuture::from(pc.create_offer()).await {
+                            Ok(answer) => answer.unchecked_into::<RtcSessionDescriptionInit>(),
+                            Err(err) => {
+                                warn!("Failed to create answer {err:?}");
+                                return;
+                            }
+                        };
+                        if let Err(err) =  wasm_bindgen_futures::JsFuture::from(pc.set_local_description(&offer)).await {
+                            warn!("Caanot set remote {err:?}");
+                            return;
+                        }
+
+                        info!("Host sending offer");
+
+                        rm.send_message(ClientMessage::SendSessionDesc(user, RTCSessionDesc{
+                            typ: JsValue::from(offer.get_type()).as_string().expect("sdp type not string"),
+                            sdp: offer.get_sdp().expect("No sdp")
+                        }), SendType::Reliable);
+                    },
+                    Err(err) => warn!("Cannot add tracks to pc {err:?}"),
+                }
+            }
         }
     }
 }

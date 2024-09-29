@@ -54,15 +54,15 @@ pub struct Room {
 #[cfg(feature = "ssr")]
 mod ssr {
     use futures::{stream::FuturesUnordered, StreamExt, TryStreamExt};
-    use message::RoomJoinInfo;
+    use message::{RoomJoinInfo, RtcConfig};
     use thiserror::Error;
     use tokio::sync::RwLock;
-    use tracing::warn;
+    use tracing::{info, warn};
     use unicase::UniCase;
     use util::generate_random_string;
 
     use super::*;
-    use std::{collections::HashMap, sync::Arc};
+    use std::{collections::HashMap, env::VarError, sync::Arc, time::SystemTimeError};
 
     #[derive(Clone, Default)]
     pub struct RoomProvider {
@@ -75,6 +75,15 @@ mod ssr {
         KeyGenerationFailed,
         #[error("given room does not exist")]
         RoomDoesntExist,
+
+        #[error("RTCConfig Generation Failed")]
+        RTCConfigGenerationFailed(#[from] VarError),
+
+        #[error("SystemTime Error")]
+        TimeError(#[from] SystemTimeError),
+
+        #[error("Hmac InvalidLength error")]
+        HmacError(#[from] sha1::digest::InvalidLength),
     }
 
     impl RoomProvider {
@@ -103,11 +112,13 @@ mod ssr {
             let room = Room::new(user);
             let player_status = room.player_status.clone();
             rooms.insert(id.clone(), room);
+            let rtc_config = get_rtc_info(&&user_meta.name.to_string()).await?;
             Ok(RoomJoinInfo {
                 room_id: id.to_lowercase(),
                 user_id: user_meta.id,
                 users: vec![user_meta],
                 player_status,
+                rtc_config,
             })
         }
 
@@ -120,11 +131,13 @@ mod ssr {
             let user_id = user.meta.id;
             if let Some(room) = rooms.get_mut(&UniCase::from(room_id)) {
                 room.users.push(user);
+                let rtc_config = get_rtc_info(&user_id.to_string()).await?;
                 Ok(RoomJoinInfo {
                     room_id: room_id.to_string(),
                     user_id,
                     users: room.users.iter().map(|u| u.meta.clone()).collect(),
                     player_status: room.player_status.clone(),
+                    rtc_config,
                 })
             } else {
                 Err(RoomProviderError::RoomDoesntExist)
@@ -178,13 +191,18 @@ mod ssr {
                 .map(|room| room.player_status.clone())
         }
 
-        pub async fn with_room<U>(
+        pub async fn with_room_mut<U>(
             &self,
             room_id: &str,
             f: impl FnOnce(&mut Room) -> U,
         ) -> Option<U> {
             let mut rooms = self.rooms.write().await;
             rooms.get_mut(&UniCase::from(room_id)).map(f)
+        }
+
+        pub async fn with_room<U>(&self, room_id: &str, f: impl FnOnce(&Room) -> U) -> Option<U> {
+            let rooms = self.rooms.read().await;
+            rooms.get(&UniCase::from(room_id)).map(f)
         }
     }
 
@@ -195,5 +213,37 @@ mod ssr {
                 player_status: PlayerStatus::Paused(0.0),
             }
         }
+    }
+
+    pub async fn get_rtc_info(username: &str) -> Result<message::RtcConfig, RoomProviderError> {
+        use base64::prelude::*;
+        use hmac::{Hmac, Mac};
+        use sha1::Sha1;
+        use std::time::SystemTime;
+        use std::time::UNIX_EPOCH;
+
+        const TTL: u64 = 3600;
+
+        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+        let timestamp = now + TTL;
+        let turn_username = format!("{}:{}", timestamp, username);
+
+        // Your TURN server's static auth secret
+        let secret = std::env::var("TURN_SECRET")?;
+
+        // Create the HMAC using secret and username
+        let mut mac = Hmac::<Sha1>::new_from_slice(secret.as_bytes())?;
+        mac.update(turn_username.as_bytes());
+        let result = mac.finalize().into_bytes();
+
+        // Base64 encode the resulting HMAC digest
+        let credential = BASE64_STANDARD.encode(result);
+
+        Ok(RtcConfig {
+            stun: "stun:coturn.deepgaurav.com:3478".to_string(),
+            turn: "turn:coturn.deepgaurav.com:3478?transport=udp".to_string(),
+            turn_user: turn_username,
+            turn_creds: credential,
+        })
     }
 }

@@ -67,6 +67,13 @@ wasm-bindgen-futures = "0.4.43"
 
 serde_json = "1"
 
+hmac = "0.12"
+sha1 = "0.10"
+base64 = "0.22"
+
+dotenvy = "0.15.7"
+
+
 [workspace.dependencies.web-sys]
 version = "0.3.70"
 features = [
@@ -75,6 +82,21 @@ features = [
     "Screen",
     "ScreenOrientation",
     "OrientationLockType",
+    "RtcPeerConnection",
+    "RtcConfiguration",
+    "RtcIceServer",
+    "MediaDevices",
+    "MediaStreamConstraints",
+    "MediaStream",
+    "MediaStreamTrack",
+    "RtcRtpSender",
+    "RtcSessionDescription",
+    "RtcSessionDescriptionInit",
+    "RtcSdpType",
+    "RtcPeerConnectionIceEvent",
+    "RtcIceCandidate",
+    "RtcIceCandidateInit",
+    "RtcTrackEvent",
 ]
 
 # See https://github.com/akesson/cargo-leptos for documentation of all the parameters.
