@@ -42,7 +42,6 @@ pub fn serialize_candidate(candidate: RtcIceCandidate) -> Result<String, JsValue
 }
 
 pub fn deserialize_candidate(candidate: &str) -> Result<RtcIceCandidateInit, JsValue> {
-    info!("Deserialize candidate {candidate}");
     let obj = JSON::parse(candidate)?;
     Ok(obj.unchecked_into())
 }
