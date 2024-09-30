@@ -1,4 +1,3 @@
-
 use leptos::*;
 use leptos_meta::Title;
 use leptos_router::*;
@@ -7,7 +6,7 @@ use wasm_bindgen::{JsCast, UnwrapThrowExt};
 
 use crate::{
     components::{
-        chatbox::ChatBox, room_info::RoomInfo, video_player::VideoPlayer,
+        audio_chat::AudioChat, chatbox::ChatBox, room_info::RoomInfo, video_player::VideoPlayer,
     },
     networking::room_manager::RoomManager,
 };
@@ -44,6 +43,7 @@ pub fn RoomPage() -> impl IntoView {
                                 view! {
                                     <RoomInfo />
                                     <ChatBox />
+                                    <AudioChat />
                                 }
                                     .into_view()
                             } else {

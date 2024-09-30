@@ -17,7 +17,7 @@ pub struct User {
     pub sender: tokio::sync::mpsc::Sender<Message>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum UserState {
     VideoNotSelected,
     VideoSelected(String),
@@ -39,7 +39,7 @@ impl PlayerStatus {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct UserMeta {
     pub id: Uuid,
     pub name: String,

@@ -21,6 +21,7 @@ pub mod pages;
 pub struct MountPoints {
     pub handle_point: NodeRef<leptos::html::Div>,
     pub side_point: NodeRef<leptos::html::Div>,
+    pub speaker_point: NodeRef<leptos::html::Div>,
 }
 
 #[derive(Clone)]
@@ -39,10 +40,12 @@ pub fn App() -> impl IntoView {
 
     let handle_point = create_node_ref();
     let side_point = create_node_ref();
+    let speaker_point = create_node_ref();
 
     let mount_points = MountPoints {
         handle_point,
         side_point,
+        speaker_point,
     };
 
     provide_context(mount_points);
@@ -102,6 +105,11 @@ pub fn App() -> impl IntoView {
                     <div
                         class="absolute left-[81.5%] w-[16%] top-[6%] h-[30%] z-20"
                         ref=handle_point
+                    ></div>
+
+                    <div
+                        class="absolute left-[81.5%] w-[16%] top-[48%] h-[48%] z-30"
+                        ref=speaker_point
                     ></div>
                 </div>
 

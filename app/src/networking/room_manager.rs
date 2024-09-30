@@ -733,6 +733,7 @@ impl RoomManager {
     pub async fn connect_audio_chat(&self, user: Uuid) {
         let rtc_config_peer =  if let RoomState::Connected(RoomConnectionInfo {
             rtc_config,
+            
             rtc_peers,            ..
         }) = &*self.state.borrow() {
             Some((*rtc_config, *rtc_peers))
@@ -740,7 +741,9 @@ impl RoomManager {
             None
         };
 
-        
+        let Some(room_info) = self.get_room_info().get_untracked() else {
+            return;
+        };
 
         if let Some((rtc_config, rtc_peers)) = rtc_config_peer
         {
@@ -810,7 +813,7 @@ impl RoomManager {
                 let peers = rtc_peers;
 
                 match add_audio_tracks(&pc).await {
-                    Ok(_) => {
+                    Ok(stream) => {
                         info!("Host added tracks");
 
                         peers.update_value(|peers| {
@@ -835,6 +838,8 @@ impl RoomManager {
                             typ: JsValue::from(offer.get_type()).as_string().expect("sdp type not string"),
                             sdp: offer.get_sdp().expect("No sdp")
                         }), SendType::Reliable);
+                        self.audio_chat_stream_signal.1.set(Some((room_info.user_id, stream)));
+                        
                     },
                     Err(err) => warn!("Cannot add tracks to pc {err:?}"),
                 }

@@ -40,23 +40,6 @@ pub fn RoomInfo() -> impl IntoView {
                                 .unwrap_or_default()
                                 .into_iter()
                                 .map(|user| {
-                                    let audio_ref = create_node_ref::<Audio>();
-                                    let audio_receiver = expect_context::<RoomManager>()
-                                        .audio_chat_stream_signal
-                                        .0;
-                                    create_effect(move |_| {
-                                        if let Some((user_id, stream)) = audio_receiver.get() {
-                                            if user.id == user_id {
-                                                if let Some(audio) = audio_ref.get_untracked() {
-                                                    info!("Set audio source");
-                                                    audio.set_src_object(Some(&stream));
-                                                    if let Err(err) =  audio.play() {
-                                                        warn!("Cannot play audio")
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    });
                                     view! {
                                         <button
                                             on:click=move |_| {
@@ -73,7 +56,6 @@ pub fn RoomInfo() -> impl IntoView {
                                                 common::UserState::VideoNotSelected => "⌛",
                                                 common::UserState::VideoSelected(_) => "✔️",
                                             }}
-                                            <audio ref=audio_ref class="hidden" />
                                         </button>
                                     }
                                 })

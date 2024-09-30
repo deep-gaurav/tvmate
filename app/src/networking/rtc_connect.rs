@@ -46,7 +46,7 @@ pub fn deserialize_candidate(candidate: &str) -> Result<RtcIceCandidateInit, JsV
     Ok(obj.unchecked_into())
 }
 
-pub async fn add_audio_tracks(pc: &RtcPeerConnection) -> Result<(), JsValue> {
+pub async fn add_audio_tracks(pc: &RtcPeerConnection) -> Result<MediaStream, JsValue> {
     let user_media = window()
         .unwrap()
         .navigator()
@@ -70,5 +70,5 @@ pub async fn add_audio_tracks(pc: &RtcPeerConnection) -> Result<(), JsValue> {
 
     wasm_bindgen_futures::JsFuture::from(pc.set_local_description(&offer)).await?;
 
-    Ok(())
+    Ok(audio_stream)
 }
