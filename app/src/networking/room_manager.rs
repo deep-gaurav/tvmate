@@ -505,7 +505,7 @@ impl RoomManager {
                                                         let rm = rm.clone();
                                                         leptos::spawn_local(async move {
                                                             match add_audio_tracks(&pc).await {
-                                                                Ok(_) => {
+                                                                Ok(stream) => {
                                                                     
                                                                 info!("new pc tracks added");
                                         
@@ -546,6 +546,11 @@ impl RoomManager {
                                                                         let _ = pc.add_ice_candidate_with_opt_rtc_ice_candidate_init(Some(&pending_ice));
                                                                     }
                                                                 }
+                                                                if let Some(self_user_id) = room_info_reader.with_untracked(|r|r.as_ref().map(|r|r.user_id)) {
+                                                                    audio_stream_setter.set(Some((self_user_id, stream)));
+
+                                                                }
+
                                                                 info!("new pc send answer");
                                                                     rm.send_message(ClientMessage::SendSessionDesc(from_user, RTCSessionDesc{
                                                                         typ: JsValue::from(answer.get_type()).as_string().expect("sdp type not string"),

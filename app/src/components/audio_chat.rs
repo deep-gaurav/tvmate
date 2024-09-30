@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use leptos::*;
 use leptos_use::use_raf_fn;
 use logging::warn;
+use tracing::info;
 use uuid::Uuid;
 use web_sys::AudioContext;
 
@@ -59,7 +60,7 @@ pub fn AudioChat() -> impl IntoView {
                             warn!("cant connect {err:?}");
                         }
 
-                        analyzer.set_fft_size(256);
+                        analyzer.set_fft_size(2048);
                         let buffer_length = analyzer.frequency_bin_count();
                         let buffer = store_value(vec![0_u8; buffer_length as usize]);
 
@@ -67,13 +68,38 @@ pub fn AudioChat() -> impl IntoView {
                             use_raf_fn(move |_| {
                                 buffer.update_value(|buffer| {
                                     analyzer.get_byte_frequency_data(buffer);
-                                    let sum: f64 =
-                                        buffer.iter().map(|val| f64::from(*val).powf(2.0)).sum();
-                                    let volume = ((sum / f64::from(buffer_length)).sqrt()
-                                        / 256_f64)
-                                        * 100_f64;
+                                    let sum_of_squares: f64 = buffer
+                                        .iter()
+                                        .map(|&val| {
+                                            let normalized = (f64::from(val) - 128.0) / 128.0;
+                                            normalized * normalized
+                                        })
+                                        .sum();
+
+                                    let rms = ((sum_of_squares / f64::from(buffer_length)) + 1e-10)
+                                        .sqrt();
+
+                                    // Map dB to percentage, assuming typical values for speech
+                                    // Adjust these values based on your specific use case
+                                    const MIN_DB: f64 = -70.0; // Adjust this if needed
+                                    const MAX_DB: f64 = 0.0; // 0 dB represents maximum volume
+
+                                    // Convert RMS to decibels, then to percentage
+                                    // Convert RMS to decibels, then to percentage
+                                    let db = if rms > 0.0 {
+                                        20.0 * rms.log10()
+                                    } else {
+                                        MIN_DB
+                                    };
+
+                                    let volume_percentage = ((db - MIN_DB) / (MAX_DB - MIN_DB)
+                                        * 100.0)
+                                        .clamp(0.0, 100.0);
+
+                                    info!("Volume {user_id} {volume_percentage:00?}");
+
                                     progress_div_ref.update(|prog_map| {
-                                        prog_map.insert(user_id, Some(volume));
+                                        prog_map.insert(user_id, Some(volume_percentage));
                                     });
                                 });
                             });
@@ -88,9 +114,9 @@ pub fn AudioChat() -> impl IntoView {
     create_effect(move |_| {
         for user in users.get() {
             audio_tag_ref.update(move |tag_map| {
-                tag_map
-                    .entry(user.id)
-                    .or_insert(create_node_ref::<leptos::html::Audio>());
+                tag_map.entry(user.id).or_insert(with_owner(owner, || {
+                    create_node_ref::<leptos::html::Audio>()
+                }));
             });
         }
     });
