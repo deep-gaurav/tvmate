@@ -42,45 +42,44 @@ pub fn AudioChat() -> impl IntoView {
                     if let Err(err) = audio.play() {
                         warn!("Cannot play audio {err:?}")
                     }
-                    let ac = AudioContext::new();
-                    match ac {
-                        Ok(ac) => {
-                            let Ok(analyzer) = ac.create_analyser() else {
-                                warn!("Cant create analyzer");
-                                return;
-                            };
-                            let Ok(source) = ac.create_media_stream_source(&stream) else {
-                                warn!("Cant create source node");
-                                return;
-                            };
-                            if let Err(err) = source.connect_with_audio_node(&analyzer) {
-                                warn!("cant connect {err:?}");
-                            }
+                }
 
-                            analyzer.set_fft_size(256);
-                            let buffer_length = analyzer.frequency_bin_count();
-                            let buffer = store_value(vec![0_u8; buffer_length as usize]);
+                let ac = AudioContext::new();
+                match ac {
+                    Ok(ac) => {
+                        let Ok(analyzer) = ac.create_analyser() else {
+                            warn!("Cant create analyzer");
+                            return;
+                        };
+                        let Ok(source) = ac.create_media_stream_source(&stream) else {
+                            warn!("Cant create source node");
+                            return;
+                        };
+                        if let Err(err) = source.connect_with_audio_node(&analyzer) {
+                            warn!("cant connect {err:?}");
+                        }
 
-                            with_owner(owner, || {
-                                use_raf_fn(move |_| {
-                                    buffer.update_value(|buffer| {
-                                        analyzer.get_byte_frequency_data(buffer);
-                                        let sum: f64 = buffer
-                                            .iter()
-                                            .map(|val| f64::from(*val).powf(2.0))
-                                            .sum();
-                                        let volume = ((sum / f64::from(buffer_length)).sqrt()
-                                            / 256_f64)
-                                            * 100_f64;
-                                        progress_div_ref.update(|prog_map| {
-                                            prog_map.insert(user_id, Some(volume));
-                                        });
+                        analyzer.set_fft_size(256);
+                        let buffer_length = analyzer.frequency_bin_count();
+                        let buffer = store_value(vec![0_u8; buffer_length as usize]);
+
+                        with_owner(owner, || {
+                            use_raf_fn(move |_| {
+                                buffer.update_value(|buffer| {
+                                    analyzer.get_byte_frequency_data(buffer);
+                                    let sum: f64 =
+                                        buffer.iter().map(|val| f64::from(*val).powf(2.0)).sum();
+                                    let volume = ((sum / f64::from(buffer_length)).sqrt()
+                                        / 256_f64)
+                                        * 100_f64;
+                                    progress_div_ref.update(|prog_map| {
+                                        prog_map.insert(user_id, Some(volume));
                                     });
                                 });
                             });
-                        }
-                        Err(err) => warn!("Cant create audio context {err:?}"),
+                        });
                     }
+                    Err(err) => warn!("Cant create audio context {err:?}"),
                 }
             }
         }
