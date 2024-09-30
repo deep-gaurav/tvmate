@@ -61,13 +61,14 @@ pub fn AudioChat() -> impl IntoView {
                         }
 
                         analyzer.set_fft_size(2048);
-                        let buffer_length = analyzer.frequency_bin_count();
-                        let buffer = store_value(vec![0_u8; buffer_length as usize]);
+                        let buffer_length = analyzer.fft_size();
+                        let buffer =
+                            with_owner(owner, || store_value(vec![0_u8; buffer_length as usize]));
 
                         with_owner(owner, || {
                             use_raf_fn(move |_| {
                                 buffer.update_value(|buffer| {
-                                    analyzer.get_byte_frequency_data(buffer);
+                                    analyzer.get_byte_time_domain_data(buffer);
                                     let sum_of_squares: f64 = buffer
                                         .iter()
                                         .map(|&val| {
