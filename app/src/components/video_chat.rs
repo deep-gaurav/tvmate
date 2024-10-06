@@ -1,6 +1,7 @@
 use std::{collections::HashMap, hash::Hash};
 
 use common::UserMeta;
+use ev::PointerEvent;
 use leptos::*;
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -74,7 +75,50 @@ pub fn VideoChat() -> impl IntoView {
     let (is_mouse_down, set_is_mouse_down) = create_signal(false);
     let (position, set_position) = create_signal((10.0, 10.0));
     let (width, set_width) = create_signal(100.0);
-    let touch_events = store_value(HashMap::new());
+
+    let diff = store_value(None);
+    let pointer_events = store_value(HashMap::new());
+
+    let pointer_up = move |ev: PointerEvent| {
+        pointer_events.update_value(|p| {
+            p.remove(&ev.pointer_id());
+        });
+        if pointer_events.with_value(|p| p.len()) < 2 {
+            diff.update_value(|d| *d = None);
+        }
+    };
+
+    let pointer_down = move |ev: PointerEvent| {
+        pointer_events.update_value(|p| {
+            p.insert(ev.pointer_id(), ev);
+        });
+    };
+
+    let pointer_move = move |ev: PointerEvent| {
+        pointer_events.update_value(|p| {
+            if let Some(val) = p.get_mut(&ev.pointer_id()) {
+                *val = ev;
+            }
+        });
+        if let (Some(ev1), Some(ev2)) = pointer_events.with_value(|p| {
+            let mut it = p.values();
+            (it.next().cloned(), it.next().cloned())
+        }) {
+            let current_diff = (((ev1.client_x() - ev2.client_x()) as f64).powi(2)
+                + ((ev1.client_y() - ev2.client_y()) as f64).powi(2))
+            .sqrt();
+            if let Some(diff) = diff.with_value(|d| *d) {
+                set_width.set(width.get_untracked() + (current_diff - diff));
+            }
+            diff.update_value(|d| *d = Some(current_diff));
+        } else if let Some(ev) = pointer_events.with_value(|p| {
+            let mut it = p.values();
+            it.next().cloned()
+        }) {
+            let (x, y) = position.get_untracked();
+            set_position.set((x - ev.movement_x() as f32, y - ev.movement_y() as f32));
+        }
+    };
 
     view! {
         <div class="fixed flex flex-col rounded-md cursor-grab z-50"
@@ -86,107 +130,13 @@ pub fn VideoChat() -> impl IntoView {
                 width.get()
             )
 
-            on:mousedown=move|_|{
-                set_is_mouse_down.set(true);
-            }
-            on:mouseup=move|_|{
-                set_is_mouse_down.set(false);
-            }
-            on:mouseleave=move|_|{
-                set_is_mouse_down.set(false);
-            }
-            on:touchstart=move|ev|{
-                let changed_touches = ev.changed_touches();
-                for i in 0..changed_touches.length() {
-                    if let Some(touch) = changed_touches.get(i) {
-                        touch_events.update_value(|touches|{
-                            touches.insert(touch.identifier(), (touch.page_x(), touch.page_y()));
-                        });
-                    }
-                }
-            }
-            on:touchend=move|ev|{
-                let changed_touches = ev.changed_touches();
-                for i in 0..changed_touches.length() {
-                    if let Some(touch) = changed_touches.get(i) {
-                        touch_events.update_value(|touches|{
-                            touches.remove(&touch.identifier());
-                        });
-                    }
-                }
-            }
-            on:touchcancel=move|ev|{
-                let changed_touches = ev.changed_touches();
-                for i in 0..changed_touches.length() {
-                    if let Some(touch) = changed_touches.get(i) {
-                        touch_events.update_value(|touches|{
-                            touches.remove(&touch.identifier());
-                        });
-                    }
-                }
-            }
-            on:touchmove=move|ev|{
-                let changed_touches = ev.changed_touches();
-                if let Some(previous_scale) = touch_events.with_value(|touchs|{
-                    if touchs.len() != 2 {
-                        None
-                    }else{
-                        let mut tc = touchs.iter();
-                        let (_,p1) = tc.next().expect("First touch not present");
-                        let (_,p2) = tc.next().expect("Second touch not present");
-                        let dist = (((p1.0 as f64).powi(2) - (p2.0 as f64).powi(2))/((p1.1 as f64).powi(2) - (p2.1 as f64).powi(2))).sqrt();
+            on:pointerdown=pointer_down
+            on:pointermove=pointer_move
 
-                        Some(dist)
-                    }
-                }){
-
-                    for i in 0..changed_touches.length() {
-                        if let Some(touch) = changed_touches.get(i) {
-                            touch_events.update_value(|touches|{
-                                touches.insert(touch.identifier(), (touch.page_x(), touch.page_y()));
-                            });
-                        }
-                    }
-
-                    if let Some(new_scale) = touch_events.with_value(|touchs|{
-                        if touchs.len() != 2 {
-                            None
-                        }else{
-                            let mut tc = touchs.iter();
-                            let (_,p1) = tc.next().expect("First touch not present");
-                            let (_,p2) = tc.next().expect("Second touch not present");
-                            let dist = (((p1.0 as f64).powi(2) - (p2.0 as f64).powi(2))/((p1.1 as f64).powi(2) - (p2.1 as f64).powi(2))).sqrt();
-
-                            Some(dist)
-                        }
-                    }){
-                        set_width.set(width.get_untracked()+new_scale-previous_scale);
-                    }
-
-
-                }
-                for i in 0..changed_touches.length() {
-                    if let Some(touch) = changed_touches.get(i) {
-                        if let Some(previous_touch) = touch_events.with_value(|touches|touches.get(&touch.identifier()).cloned()){
-                            let (x,y) = position.get_untracked();
-                            set_position.set(
-                                (x-(touch.page_x() as f32 - previous_touch.0 as f32), y-(touch.page_y() as f32 - previous_touch.1 as f32))
-                            );
-                            touch_events.update_value(|touches|{
-                                touches.insert(touch.identifier(), (touch.page_x(),touch.page_y()));
-                            })
-                        }
-                    }
-                }
-            }
-            on:mousemove=move|ev|{
-                if is_mouse_down.get_untracked() {
-                    let (x,y) = position.get_untracked();
-                    set_position.set(
-                        (x-ev.movement_x() as f32, y-ev.movement_y() as f32)
-                    );
-                }
-            }
+            on:pointerup=pointer_up
+            on:pointercancel=pointer_up
+            on:pointerout=pointer_up
+            on:pointerleave=pointer_up
         >
             <For
                 each=move||{
