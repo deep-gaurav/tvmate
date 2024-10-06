@@ -833,7 +833,7 @@ impl RoomManager {
                             let video_sender = self.video_chat_stream_signal.1;
                             move |ev| {
                                 let track = ev.track();
-                                if let Ok(stream) = MediaStream::new_with_tracks(&track) {
+                                if let Ok(stream) = MediaStream::new_with_tracks(&Array::of1(&track)) {
                                     if track.kind() == "audio" {
                                         audio_sender.set(Some((user, stream)));
                                     }else{
