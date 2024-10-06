@@ -121,7 +121,7 @@ pub fn VideoChat() -> impl IntoView {
     };
 
     view! {
-        <div class="fixed flex flex-col rounded-md cursor-grab z-50"
+        <div class="fixed flex flex-col rounded-md cursor-grab z-50 touch-none"
 
             style=move||format!(
                 "right: {}px; bottom: {}px; width: {}px",
