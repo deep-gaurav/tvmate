@@ -6,7 +6,8 @@ use wasm_bindgen::{JsCast, UnwrapThrowExt};
 
 use crate::{
     components::{
-        audio_chat::AudioChat, chatbox::ChatBox, room_info::RoomInfo, video_player::VideoPlayer,
+        audio_chat::AudioChat, chatbox::ChatBox, room_info::RoomInfo, video_chat::VideoChat,
+        video_player::VideoPlayer,
     },
     networking::room_manager::RoomManager,
 };
@@ -44,6 +45,7 @@ pub fn RoomPage() -> impl IntoView {
                                     <RoomInfo />
                                     <ChatBox />
                                     <AudioChat />
+                                    <VideoChat />
                                 }
                                     .into_view()
                             } else {

@@ -3,4 +3,5 @@ pub mod chatbox;
 pub mod dialog;
 pub mod portal;
 pub mod room_info;
+pub mod video_chat;
 pub mod video_player;

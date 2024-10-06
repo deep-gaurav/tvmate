@@ -22,11 +22,11 @@ use tracing::info;
 use uuid::Uuid;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{
-    MediaStream, RtcIceCandidateInit, RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType, RtcSessionDescriptionInit, RtcTrackEvent, WebSocket
+    MediaStream, MediaStreamTrack, RtcIceCandidateInit, RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType, RtcSessionDescriptionInit, RtcTrackEvent, WebSocket
 };
 
 use crate::{
-    networking::rtc_connect::{add_audio_tracks, connect_rtc, deserialize_candidate, serialize_candidate},
+    networking::rtc_connect::{add_media_tracks, connect_rtc, deserialize_candidate, serialize_candidate},
     Endpoint,
 };
 
@@ -39,6 +39,10 @@ pub struct RoomManager {
         WriteSignal<Option<PlayerMessages>>,
     ),
     pub audio_chat_stream_signal: (
+        ReadSignal<Option<(Uuid, MediaStream)>>,
+        WriteSignal<Option<(Uuid, MediaStream)>>,
+    ),
+    pub video_chat_stream_signal: (
         ReadSignal<Option<(Uuid, MediaStream)>>,
         WriteSignal<Option<(Uuid, MediaStream)>>,
     ),
@@ -154,6 +158,7 @@ impl RoomManager {
             room_info_signal: create_signal(None),
             player_message_tx: create_signal(None),
             audio_chat_stream_signal: create_signal(None),
+            video_chat_stream_signal: create_signal(None),
             owner,
         }
     }
@@ -233,6 +238,7 @@ impl RoomManager {
                     let rm = self.clone();
 
                     let audio_stream_setter = self.audio_chat_stream_signal.1;
+                    let video_stream_setter = self.video_chat_stream_signal.1;
 
                     create_effect(move |_| {
                         let message = message.get();
@@ -490,21 +496,32 @@ impl RoomManager {
                                                                     "track"
                                                                 ),
                                                                 
-                                                                    move |ev| {
-                                                                        
-                                                                        info!("new pc tracks received");
-                                                                        info!("Received track from rtc streams len {}", ev.streams().length());
-                                                                        if let Some(stream) = ev.streams().get(0).dyn_ref::<MediaStream>() {
-                                                                            audio_stream_setter.set(Some((from_user, stream.clone())));
-                                                                        }
+                                                                move |ev| {
+                                                                    info!("Received track");
+                                                                    let track = ev.track();
+                                                                    info!("Track kind {}", track.kind());
+                                                                    match ev.streams().get(0).dyn_into::<MediaStream>() {
+                                                                        Ok(stream) => {
+                                                                            if track.kind() == "audio" {
+                                                                                info!("set audio");
+                                                                                audio_stream_setter.set(Some((from_user, stream)));
+                                                                            }else{
+                                                                                info!("set video");
+                                                                                video_stream_setter.set(Some((from_user, stream)));
+                                                                            }
+                                                                        },
+                                                                        Err(err) => {
+                                                                            warn!("Cant create stream from track {err:?}");
+                                                                        },
                                                                     }
+                                                                }
                                                                 ,
                                                             )
                                                         });
                                                         let peers = *rtc_peers;
                                                         let rm = rm.clone();
                                                         leptos::spawn_local(async move {
-                                                            match add_audio_tracks(&pc).await {
+                                                            match add_media_tracks(&pc).await {
                                                                 Ok(stream) => {
                                                                     
                                                                 info!("new pc tracks added");
@@ -547,7 +564,16 @@ impl RoomManager {
                                                                     }
                                                                 }
                                                                 if let Some(self_user_id) = room_info_reader.with_untracked(|r|r.as_ref().map(|r|r.user_id)) {
-                                                                    audio_stream_setter.set(Some((self_user_id, stream)));
+                                                                    if let Ok(audio) = stream.get_audio_tracks().get(0).dyn_into::<MediaStreamTrack>() {
+                                                                        if let Ok(audio_stream) = MediaStream::new_with_tracks(&audio){
+                                                                            audio_stream_setter.set(Some((self_user_id, audio_stream)));
+                                                                        }
+                                                                    }
+                                                                    if let Ok(video) = stream.get_video_tracks().get(0).dyn_into::<MediaStreamTrack>() {
+                                                                        if let Ok(video_stream) = MediaStream::new_with_tracks(&video){
+                                                                            video_stream_setter.set(Some((self_user_id, video_stream)));
+                                                                        }
+                                                                    }
 
                                                                 }
 
@@ -803,21 +829,24 @@ impl RoomManager {
                     ),
                     
                         {
-                            let sender = self.audio_chat_stream_signal.1;
-
+                            let audio_sender = self.audio_chat_stream_signal.1;
+                            let video_sender = self.video_chat_stream_signal.1;
                             move |ev| {
-                                info!("Host received tracks");
-                                info!("Received track from rtc streams len {}", ev.streams().length());
-                                // Currently we only have 1 audio stream
-                                if let Some(stream) = ev.streams().get(0).dyn_ref::<MediaStream>() {
-                                sender.set(Some((user,stream.clone())));
+                                let track = ev.track();
+                                if let Ok(stream) = MediaStream::new_with_tracks(&track) {
+                                    if track.kind() == "audio" {
+                                        audio_sender.set(Some((user, stream)));
+                                    }else{
+                                        video_sender.set(Some((user, stream)));
+                                    }
+                                }
                             }
-                        }}
+                        }
                     ,
                 );
                 let peers = rtc_peers;
 
-                match add_audio_tracks(&pc).await {
+                match add_media_tracks(&pc).await {
                     Ok(stream) => {
                         info!("Host added tracks");
 
@@ -843,7 +872,17 @@ impl RoomManager {
                             typ: JsValue::from(offer.get_type()).as_string().expect("sdp type not string"),
                             sdp: offer.get_sdp().expect("No sdp")
                         }), SendType::Reliable);
-                        self.audio_chat_stream_signal.1.set(Some((room_info.user_id, stream)));
+
+                        if let Ok(audio) = stream.get_audio_tracks().get(0).dyn_into::<MediaStreamTrack>() {
+                            if let Ok(audio_stream) = MediaStream::new_with_tracks(&audio){
+                                self.audio_chat_stream_signal.1.set(Some((room_info.user_id, audio_stream)));
+                            }
+                        }
+                        if let Ok(video) = stream.get_video_tracks().get(0).dyn_into::<MediaStreamTrack>() {
+                            if let Ok(video_stream) = MediaStream::new_with_tracks(&video){
+                                self.video_chat_stream_signal.1.set(Some((room_info.user_id, video_stream)));
+                            }
+                        }
                         
                     },
                     Err(err) => warn!("Cannot add tracks to pc {err:?}"),

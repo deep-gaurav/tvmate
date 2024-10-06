@@ -1,12 +1,9 @@
-use leptos::ServerFnError;
-use serde::{Deserialize, Serialize};
 use tracing::info;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{
     js_sys::{Array, JSON},
     window, MediaStream, MediaStreamConstraints, RtcConfiguration, RtcIceCandidate,
-    RtcIceCandidateInit, RtcIceServer, RtcPeerConnection, RtcSessionDescription,
-    RtcSessionDescriptionInit,
+    RtcIceCandidateInit, RtcIceServer, RtcPeerConnection, RtcSessionDescriptionInit,
 };
 
 pub fn connect_rtc(
@@ -46,7 +43,7 @@ pub fn deserialize_candidate(candidate: &str) -> Result<RtcIceCandidateInit, JsV
     Ok(obj.unchecked_into())
 }
 
-pub async fn add_audio_tracks(pc: &RtcPeerConnection) -> Result<MediaStream, JsValue> {
+pub async fn add_media_tracks(pc: &RtcPeerConnection) -> Result<MediaStream, JsValue> {
     let user_media = window()
         .unwrap()
         .navigator()
@@ -55,14 +52,21 @@ pub async fn add_audio_tracks(pc: &RtcPeerConnection) -> Result<MediaStream, JsV
         .get_user_media_with_constraints(&{
             let constraints = MediaStreamConstraints::new();
             constraints.set_audio(&JsValue::from_bool(true));
+            constraints.set_video(&JsValue::from_bool(true));
             constraints
         })?;
-    let audio_stream = wasm_bindgen_futures::JsFuture::from(user_media)
+    let media_stream = wasm_bindgen_futures::JsFuture::from(user_media)
         .await?
         .dyn_into::<MediaStream>()?;
 
-    for track in audio_stream.get_audio_tracks() {
-        pc.add_track(&track.dyn_into()?, &audio_stream, &Array::new());
+    for track in media_stream.get_audio_tracks() {
+        info!("Add Audio track");
+        pc.add_track(&track.dyn_into()?, &media_stream, &Array::new());
+    }
+
+    for track in media_stream.get_video_tracks() {
+        info!("Add Video track");
+        pc.add_track(&track.dyn_into()?, &media_stream, &Array::new());
     }
 
     let offer = wasm_bindgen_futures::JsFuture::from(pc.create_offer()).await?;
@@ -70,5 +74,5 @@ pub async fn add_audio_tracks(pc: &RtcPeerConnection) -> Result<MediaStream, JsV
 
     wasm_bindgen_futures::JsFuture::from(pc.set_local_description(&offer)).await?;
 
-    Ok(audio_stream)
+    Ok(media_stream)
 }

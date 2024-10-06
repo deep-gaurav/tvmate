@@ -40,9 +40,12 @@ pub fn AudioChat() -> impl IntoView {
             if let Some(audio_ref) = audio_tag_ref.with(|map| map.get(&user_id).cloned()) {
                 if let Some(audio) = audio_ref.get_untracked() {
                     audio.set_src_object(Some(&stream));
+                    info!("Playing audio");
                     if let Err(err) = audio.play() {
                         warn!("Cannot play audio {err:?}")
                     }
+                } else {
+                    info!("No audio in ref");
                 }
 
                 let ac = AudioContext::new();
@@ -97,7 +100,7 @@ pub fn AudioChat() -> impl IntoView {
                                         * 100.0)
                                         .clamp(0.0, 100.0);
 
-                                    info!("Volume {user_id} {volume_percentage:00?}");
+                                    // info!("Volume {user_id} {volume_percentage:00?}");
 
                                     progress_div_ref.update(|prog_map| {
                                         prog_map.insert(user_id, Some(volume_percentage));
