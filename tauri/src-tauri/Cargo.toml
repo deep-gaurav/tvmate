@@ -12,10 +12,10 @@ name = "tvmate_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.0.0-rc", features = [] }
+tauri-build = { version = "2.0.1", features = [] }
 
 [dependencies]
-tauri = { version = "2.0.0-rc", features = [] }
-tauri-plugin-shell = "2.0.0-rc"
+tauri = { version = "2.0.1", features = [] }
+tauri-plugin-shell = "2.0.1"
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true

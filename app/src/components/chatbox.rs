@@ -5,15 +5,13 @@ use crate::{components::portal::Portal, networking::room_manager::RoomManager, M
 
 #[component]
 pub fn ChatBox() -> impl IntoView {
-
-
     let room_manager = expect_context::<RoomManager>();
 
     if let Some((message_signal, message_history)) = room_manager.get_chat_signal() {
         let (msg_len, set_msg_len) = create_signal(message_history.with_value(|v| v.len()));
 
         create_effect(move |_| {
-            message_signal.with(|_|());
+            message_signal.with(|_| ());
             set_msg_len.set(message_history.with_value(|v| v.len()));
         });
         let (chat_msg, set_chat_msg) = create_signal(String::new());
@@ -35,7 +33,7 @@ pub fn ChatBox() -> impl IntoView {
                             <div class="text-center w-full">"Chat"</div>
                             // <hr class="border-white border-t w-full" />
 
-                            <div class="flex-grow overflow-auto h-full w-full flex flex-col-reverse">
+                            <div class="flex-grow h-0 overflow-auto w-full flex flex-col-reverse">
                                 <For
                                     each=move || {
                                         let len = msg_len.get();
@@ -68,7 +66,7 @@ pub fn ChatBox() -> impl IntoView {
                                 }
                             >
                                 <input
-                                    class="w-full text-md font-thin16 p-2 bg-transparent text-white"
+                                    class="w-full text-kg font-thin16 p-2 bg-transparent text-white"
                                     placeholder="Enter msg to chat"
                                     on:input=move |ev| { set_chat_msg.set(event_target_value(&ev)) }
                                     on:keyup=move |ev| {
@@ -80,7 +78,7 @@ pub fn ChatBox() -> impl IntoView {
                                     }
                                     prop:value=chat_msg
                                 />
-                                <button class="p-2 border text-md font-thin14 ">"Submit"</button>
+                                <button class="p-3 border text-kg font-thin14 ">"Submit"</button>
                             </form>
                         </Portal>
                     }
@@ -91,9 +89,7 @@ pub fn ChatBox() -> impl IntoView {
                 }
             }}
         }.into_view()
-    }else{
+    } else {
         view! {}.into_view()
     }
-
-
 }
