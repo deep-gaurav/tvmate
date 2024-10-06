@@ -22,7 +22,7 @@ use tracing::info;
 use uuid::Uuid;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{
-    MediaStream, MediaStreamTrack, RtcIceCandidateInit, RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType, RtcSessionDescriptionInit, RtcTrackEvent, WebSocket
+    js_sys::Array, MediaStream, MediaStreamTrack, RtcIceCandidateInit, RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType, RtcSessionDescriptionInit, RtcTrackEvent, WebSocket
 };
 
 use crate::{
@@ -565,12 +565,12 @@ impl RoomManager {
                                                                 }
                                                                 if let Some(self_user_id) = room_info_reader.with_untracked(|r|r.as_ref().map(|r|r.user_id)) {
                                                                     if let Ok(audio) = stream.get_audio_tracks().get(0).dyn_into::<MediaStreamTrack>() {
-                                                                        if let Ok(audio_stream) = MediaStream::new_with_tracks(&audio){
+                                                                        if let Ok(audio_stream) = MediaStream::new_with_tracks(&Array::of1(&audio)){
                                                                             audio_stream_setter.set(Some((self_user_id, audio_stream)));
                                                                         }
                                                                     }
                                                                     if let Ok(video) = stream.get_video_tracks().get(0).dyn_into::<MediaStreamTrack>() {
-                                                                        if let Ok(video_stream) = MediaStream::new_with_tracks(&video){
+                                                                        if let Ok(video_stream) = MediaStream::new_with_tracks(&Array::of1(&video)){
                                                                             video_stream_setter.set(Some((self_user_id, video_stream)));
                                                                         }
                                                                     }
@@ -874,12 +874,12 @@ impl RoomManager {
                         }), SendType::Reliable);
 
                         if let Ok(audio) = stream.get_audio_tracks().get(0).dyn_into::<MediaStreamTrack>() {
-                            if let Ok(audio_stream) = MediaStream::new_with_tracks(&audio){
+                            if let Ok(audio_stream) = MediaStream::new_with_tracks(&Array::of1(&audio)){
                                 self.audio_chat_stream_signal.1.set(Some((room_info.user_id, audio_stream)));
                             }
                         }
                         if let Ok(video) = stream.get_video_tracks().get(0).dyn_into::<MediaStreamTrack>() {
-                            if let Ok(video_stream) = MediaStream::new_with_tracks(&video){
+                            if let Ok(video_stream) = MediaStream::new_with_tracks(&Array::of1(&video)){
                                 self.video_chat_stream_signal.1.set(Some((room_info.user_id, video_stream)));
                             }
                         }
