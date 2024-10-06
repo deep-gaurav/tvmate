@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash};
 
 use common::UserMeta;
 use leptos::*;
@@ -73,15 +73,17 @@ pub fn VideoChat() -> impl IntoView {
 
     let (is_mouse_down, set_is_mouse_down) = create_signal(false);
     let (position, set_position) = create_signal((10.0, 10.0));
-    let (previous_touch, set_previous_touch) = create_signal(None);
+    let (width, set_width) = create_signal(100.0);
+    let touch_events = store_value(HashMap::new());
 
     view! {
-        <div class="fixed w-40 flex flex-col rounded-md cursor-grab z-50"
+        <div class="fixed flex flex-col rounded-md cursor-grab z-50"
 
             style=move||format!(
-                "right: {}px; bottom: {}px;",
+                "right: {}px; bottom: {}px; width: {}px",
                 position.get().0,
                 position.get().1,
+                width.get()
             )
 
             on:mousedown=move|_|{
@@ -95,22 +97,85 @@ pub fn VideoChat() -> impl IntoView {
             }
             on:touchstart=move|ev|{
                 let changed_touches = ev.changed_touches();
-                if let Some(touch) = changed_touches.get(0) {
-                    set_previous_touch.set(Some((touch.page_x(), touch.page_y())));
+                for i in 0..changed_touches.length() {
+                    if let Some(touch) = changed_touches.get(i) {
+                        touch_events.update_value(|touches|{
+                            touches.insert(touch.identifier(), (touch.page_x(), touch.page_y()));
+                        });
+                    }
                 }
             }
-            on:touchend=move|_|{
-                set_previous_touch.set(None);
+            on:touchend=move|ev|{
+                let changed_touches = ev.changed_touches();
+                for i in 0..changed_touches.length() {
+                    if let Some(touch) = changed_touches.get(i) {
+                        touch_events.update_value(|touches|{
+                            touches.remove(&touch.identifier());
+                        });
+                    }
+                }
+            }
+            on:touchcancel=move|ev|{
+                let changed_touches = ev.changed_touches();
+                for i in 0..changed_touches.length() {
+                    if let Some(touch) = changed_touches.get(i) {
+                        touch_events.update_value(|touches|{
+                            touches.remove(&touch.identifier());
+                        });
+                    }
+                }
             }
             on:touchmove=move|ev|{
-                if let Some(previous_touch) = previous_touch.get_untracked() {
-                    let changed_touches = ev.changed_touches();
-                    if let Some(touch) = changed_touches.get(0) {
-                        let (x,y) = position.get_untracked();
-                        set_position.set(
-                            (x-(touch.page_x() as f32 - previous_touch.0 as f32), y-(touch.page_y() as f32 - previous_touch.1 as f32))
-                        );
-                        set_previous_touch.set(Some((touch.page_x(),touch.page_y())))
+                let changed_touches = ev.changed_touches();
+                if let Some(previous_scale) = touch_events.with_value(|touchs|{
+                    if touchs.len() != 2 {
+                        None
+                    }else{
+                        let mut tc = touchs.iter();
+                        let (_,p1) = tc.next().expect("First touch not present");
+                        let (_,p2) = tc.next().expect("Second touch not present");
+                        let dist = (((p1.0 as f64).powi(2) - (p2.0 as f64).powi(2))/((p1.1 as f64).powi(2) - (p2.1 as f64).powi(2))).sqrt();
+
+                        Some(dist)
+                    }
+                }){
+
+                    for i in 0..changed_touches.length() {
+                        if let Some(touch) = changed_touches.get(i) {
+                            touch_events.update_value(|touches|{
+                                touches.insert(touch.identifier(), (touch.page_x(), touch.page_y()));
+                            });
+                        }
+                    }
+
+                    if let Some(new_scale) = touch_events.with_value(|touchs|{
+                        if touchs.len() != 2 {
+                            None
+                        }else{
+                            let mut tc = touchs.iter();
+                            let (_,p1) = tc.next().expect("First touch not present");
+                            let (_,p2) = tc.next().expect("Second touch not present");
+                            let dist = (((p1.0 as f64).powi(2) - (p2.0 as f64).powi(2))/((p1.1 as f64).powi(2) - (p2.1 as f64).powi(2))).sqrt();
+
+                            Some(dist)
+                        }
+                    }){
+                        set_width.set(width.get_untracked()+new_scale-previous_scale);
+                    }
+
+
+                }
+                for i in 0..changed_touches.length() {
+                    if let Some(touch) = changed_touches.get(i) {
+                        if let Some(previous_touch) = touch_events.with_value(|touches|touches.get(&touch.identifier()).cloned()){
+                            let (x,y) = position.get_untracked();
+                            set_position.set(
+                                (x-(touch.page_x() as f32 - previous_touch.0 as f32), y-(touch.page_y() as f32 - previous_touch.1 as f32))
+                            );
+                            touch_events.update_value(|touches|{
+                                touches.insert(touch.identifier(), (touch.page_x(),touch.page_y()));
+                            })
+                        }
                     }
                 }
             }
