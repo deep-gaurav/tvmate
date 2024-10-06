@@ -71,8 +71,58 @@ pub fn VideoChat() -> impl IntoView {
         }
     });
 
+    let (is_mouse_down, set_is_mouse_down) = create_signal(false);
+    let (position, set_position) = create_signal((10.0, 10.0));
+    let (previous_touch, set_previous_touch) = create_signal(None);
+
     view! {
-        <div class="fixed right-4 bottom-4 w-40 select-none pointer-events-none flex flex-col">
+        <div class="fixed w-40 flex flex-col rounded-md cursor-grab z-50"
+
+            style=move||format!(
+                "right: {}px; bottom: {}px;",
+                position.get().0,
+                position.get().1,
+            )
+
+            on:mousedown=move|_|{
+                set_is_mouse_down.set(true);
+            }
+            on:mouseup=move|_|{
+                set_is_mouse_down.set(false);
+            }
+            on:mouseleave=move|_|{
+                set_is_mouse_down.set(false);
+            }
+            on:touchstart=move|ev|{
+                let changed_touches = ev.changed_touches();
+                if let Some(touch) = changed_touches.get(0) {
+                    set_previous_touch.set(Some((touch.page_x(), touch.page_y())));
+                }
+            }
+            on:touchend=move|_|{
+                set_previous_touch.set(None);
+            }
+            on:touchmove=move|ev|{
+                if let Some(previous_touch) = previous_touch.get_untracked() {
+                    let changed_touches = ev.changed_touches();
+                    if let Some(touch) = changed_touches.get(0) {
+                        let (x,y) = position.get_untracked();
+                        set_position.set(
+                            (x-(touch.page_x() as f32 - previous_touch.0 as f32), y-(touch.page_y() as f32 - previous_touch.1 as f32))
+                        );
+                        set_previous_touch.set(Some((touch.page_x(),touch.page_y())))
+                    }
+                }
+            }
+            on:mousemove=move|ev|{
+                if is_mouse_down.get_untracked() {
+                    let (x,y) = position.get_untracked();
+                    set_position.set(
+                        (x-ev.movement_x() as f32, y-ev.movement_y() as f32)
+                    );
+                }
+            }
+        >
             <For
                 each=move||{
                     let users = video_users.get().keys().cloned().collect::<Vec<_>>();
@@ -88,7 +138,7 @@ pub fn VideoChat() -> impl IntoView {
                             let is_video_active = user.is_video_active;
                             view! {
                                 <video ref={video_ref}
-                                    class="w-full h-40"
+                                    class="w-full"
                                     class=("hidden", move || !is_video_active.get())
                                 />
                             }.into_view()
