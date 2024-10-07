@@ -1,5 +1,8 @@
 use axum::{
-    extract::{ws::WebSocket, Query, State, WebSocketUpgrade},
+    extract::{
+        ws::{self, CloseCode, CloseFrame, WebSocket},
+        Query, State, WebSocketUpgrade,
+    },
     http::StatusCode,
     response::{IntoResponse, Response},
 };
@@ -75,10 +78,26 @@ pub async fn join_room(
         sender: tx,
     };
 
-    let join_info = app_state
+    let join_info = match app_state
         .rooms
         .join_room(&join_params.room_id.to_lowercase(), user)
-        .await?;
+        .await
+    {
+        Ok(info) => info,
+        Err(error) => {
+            return Ok(ws.on_upgrade(move |mut sock| async move {
+                if let Err(err) = sock
+                    .send(axum::extract::ws::Message::Close(Some(CloseFrame {
+                        code: ws::close_code::POLICY,
+                        reason: error.to_string().into(),
+                    })))
+                    .await
+                {
+                    warn!("Cant send close {err:?}");
+                }
+            }))
+        }
+    };
     let room_id = join_params.room_id;
     if let Some(player_status) = app_state.rooms.get_room_player_status(&room_id).await {
         app_state

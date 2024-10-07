@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use crate::error_template::{AppError, ErrorTemplate};
 
 use cfg_if::cfg_if;
+use components::toaster::ToasterWrapper;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
@@ -81,6 +82,7 @@ pub fn App() -> impl IntoView {
             outside_errors.insert_with_default_key(AppError::NotFound);
             view! { <ErrorTemplate outside_errors /> }.into_view()
         }>
+            <ToasterWrapper>
             <main
                 class="bg-black h-full w-full flex justify-center items-center text-white font-thin8"
                 style=move || {
@@ -115,6 +117,7 @@ pub fn App() -> impl IntoView {
 
                 <div ref=side_point></div>
             </main>
+            </ToasterWrapper>
         </Router>
     }
 }

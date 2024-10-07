@@ -26,8 +26,7 @@ use web_sys::{
 };
 
 use crate::{
-    networking::rtc_connect::{add_media_tracks, connect_rtc, deserialize_candidate, serialize_candidate},
-    Endpoint,
+    components::toaster::{Toast, Toaster}, networking::rtc_connect::{add_media_tracks, connect_rtc, deserialize_candidate, serialize_candidate}, Endpoint
 };
 
 #[derive(Clone)]
@@ -176,10 +175,13 @@ impl RoomManager {
         name: String,
         room_code: Option<String>,
     ) -> Result<Signal<Option<Message>>, RoomManagerError> {
+        let toaster = expect_context::<Toaster>();
+        toaster.toast(Toast{message:"Connecting to server".into(), r#type:crate::components::toaster::ToastType::Info});
         with_owner(self.owner, || {
             let owner = self.owner;
             let is_disconnected = self.state.borrow().is_disconnected();
             if !is_disconnected {
+                toaster.toast(Toast{message:"Already connected to a room".into(), r#type:crate::components::toaster::ToastType::Failed});
                 return Err(RoomManagerError::AlreadyConnectedToRoom);
             }
             let url = if room_code.is_some() {
@@ -208,7 +210,15 @@ impl RoomManager {
                     } = use_websocket_with_options::<Message, Message, BincodeSerdeCodec>(
                         &format!("{main_endpoint}{url}?{params}"),
                         UseWebSocketOptions::default()
-                            .reconnect_limit(leptos_use::ReconnectLimit::Limited(0)),
+                            .reconnect_limit(leptos_use::ReconnectLimit::Limited(0))
+                            .on_error(move|err|{
+                                toaster.toast(Toast{message:"Connection Failed".to_string().into(), r#type:crate::components::toaster::ToastType::Failed});
+                            })
+                            .on_close(move|ev|{
+                                let reason = ev.reason();
+                                toaster.toast(Toast{message:reason.into(), r#type:crate::components::toaster::ToastType::Failed});
+                            })
+                            ,
                     );
                     let state_c = self.state.clone();
                     let state_c1 = self.state.clone();
@@ -223,6 +233,7 @@ impl RoomManager {
                                 info!("Connecting to ws")
                             }
                             leptos_use::core::ConnectionReadyState::Open => {
+                                toaster.toast(Toast{message:"Connection Successful".into(), r#type:crate::components::toaster::ToastType::Success});
                                 info!("Opened ws")
                             }
                             leptos_use::core::ConnectionReadyState::Closing

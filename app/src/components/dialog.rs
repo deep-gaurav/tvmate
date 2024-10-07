@@ -4,11 +4,13 @@ use leptos::*;
 pub fn Dialog(
     #[prop(into)] is_open: MaybeSignal<bool>,
     #[prop(into)] on_close: Callback<()>,
+    #[prop(into)] is_self_sized: MaybeSignal<bool>,
     children: Children,
 ) -> impl IntoView {
     view! {
         <div
-            class="absolute h-full w-full bg-black/30 flex items-center justify-center p-10"
+            class="bg-black/30 flex items-center justify-center"
+            class=(["absolute","h-full","w-full","p-10"], move || !is_self_sized.get())
             class=("hidden", move || !is_open.get())
         >
             <div class="p-1 bg-black relative shadow-box shadow-white/45 ">

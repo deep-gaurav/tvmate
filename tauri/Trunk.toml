@@ -2,7 +2,8 @@
 target = "./index.html"
 
 [watch]
-ignore = ["./src-tauri"]
+ignore = ["./src-tauri", "../target"]
+watch = ["../"]
 
 [serve]
 address = "0.0.0.0"

@@ -8,6 +8,7 @@ use wasm_bindgen::{JsCast, JsValue};
 use web_sys::js_sys;
 
 use crate::components::dialog::Dialog;
+use crate::components::toaster::{Toast, Toaster};
 use crate::networking::room_manager::RoomManager;
 
 /// Renders the home page of your application.
@@ -31,6 +32,7 @@ pub fn HomePage() -> impl IntoView {
 
     view! {
         <Dialog
+            is_self_sized=false
             is_open=host_open
             on_close=move |_| {
                 set_host_open.set(false);
@@ -64,13 +66,16 @@ pub fn HomePage() -> impl IntoView {
                         class="text-sm hover:bg-white/20 self-center px-4 py-1"
                         type="button"
                         on:click=move |_| {
+                            let toaster = expect_context::<Toaster>();
+                            toaster.toast(Toast{message:"Hosting room".into(), r#type:crate::components::toaster::ToastType::Info});
+
                             if name.get_untracked().is_empty() {
-                                warn!("Name cant be empty");
+                                toaster.toast(Toast{message:"Name cannot be empty".into(), r#type:crate::components::toaster::ToastType::Failed});
                             } else {
                                 let room_manager = expect_context::<RoomManager>();
                                 if let Err(err) = room_manager.host_join(name.get_untracked(), None)
                                 {
-                                    warn!("Cannot join {err:#?}");
+                                    toaster.toast(Toast{message:format!("Cannot join room {err:?}").into(), r#type:crate::components::toaster::ToastType::Failed});
                                 }
                             }
                         }
@@ -82,6 +87,7 @@ pub fn HomePage() -> impl IntoView {
         </Dialog>
 
         <Dialog
+            is_self_sized=false
             is_open=join_open
             on_close=move |_| {
                 set_join_open.set(false);
