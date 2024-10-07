@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2.0.0-rc",
-  "productName": "tvmate",
+  "productName": "TVMate",
   "version": "0.1.0",
   "identifier": "com.deepgaurav.tvmate",
   "build": {
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "tvmate",
+        "title": "TVMate",
         "width": 800,
         "height": 600
       }
