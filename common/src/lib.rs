@@ -112,7 +112,7 @@ mod ssr {
             let room = Room::new(user);
             let player_status = room.player_status.clone();
             rooms.insert(id.clone(), room);
-            let rtc_config = get_rtc_info(&&user_meta.name.to_string()).await?;
+            let rtc_config = get_rtc_info(&user_meta.name.to_string()).await?;
             Ok(RoomJoinInfo {
                 room_id: id.to_lowercase(),
                 user_id: user_meta.id,

@@ -37,12 +37,7 @@ pub fn ToasterWrapper(children: Children) -> impl IntoView {
         write_toast: toast_tx,
     });
 
-    let UseTimeoutFnReturn {
-        is_pending,
-        start,
-        stop,
-        ..
-    } = use_timeout_fn(
+    let UseTimeoutFnReturn { start, stop, .. } = use_timeout_fn(
         move |_: ()| {
             toast_tx.set(None);
         },

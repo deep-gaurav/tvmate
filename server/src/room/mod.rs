@@ -1,6 +1,6 @@
 use axum::{
     extract::{
-        ws::{self, CloseCode, CloseFrame, WebSocket},
+        ws::{self, CloseFrame, WebSocket},
         Query, State, WebSocketUpgrade,
     },
     http::StatusCode,
@@ -210,7 +210,7 @@ async fn handle_websocket(
                                                                         }
                                                                     }
                                                                 },
-                                                                common::message::ClientMessage::ReceivedSessionDesc(rtcsession_desc) => {
+                                                                common::message::ClientMessage::ReceivedSessionDesc(_rtcsession_desc) => {
                                                                     warn!("Shouldnt receive received desc");
                                                                 },
                                                             }
