@@ -146,6 +146,24 @@ pub fn VideoChat() -> impl IntoView {
             }
         }
     };
+    create_effect(move |_| {
+        let (window_width, window_height) = (window_width.get(), window_height.get());
+        if let Some(div) = div_ref.get_untracked() {
+            let (current_width, current_height) =
+                (div.offset_width() as f32, div.offset_height() as f32);
+
+            let max_width =
+                window_width.min(((current_width / current_height) as f64) * window_height);
+            let expected_new_width: f64 = width.get_untracked();
+            set_width.set(expected_new_width.min(max_width));
+            let new_width = width.get_untracked();
+            let new_height = ((current_height / current_width) as f64) * new_width;
+            let max_left = window_width - new_width;
+            let max_top = window_height - new_height;
+            let (x, y): (f32, f32) = position.get_untracked();
+            set_position.set((x.clamp(0.0, max_left as f32), y.clamp(0.0, max_top as f32)));
+        }
+    });
 
     view! {
         <Portal>
