@@ -1,101 +1,59 @@
-<picture>
-    <source srcset="https://raw.githubusercontent.com/leptos-rs/leptos/main/docs/logos/Leptos_logo_Solid_White.svg" media="(prefers-color-scheme: dark)">
-    <img src="https://raw.githubusercontent.com/leptos-rs/leptos/main/docs/logos/Leptos_logo_RGB.svg" alt="Leptos Logo">
-</picture>
+<p align="center"><a href="https://github.com/deep-gaurav"><img src="tauri/app-icon.png" width="150"></a></p> 
+<h2 align="center"><b>TVMate</b></h2>
+<h4 align="center">Synchronized Video Playback Across Devices with Retro Charm</h4>
 
-# Leptos Axum Starter Template
+<hr>
 
-This is a template for use with the [Leptos](https://github.com/leptos-rs/leptos) web framework and the [cargo-leptos](https://github.com/akesson/cargo-leptos) tool using [Axum](https://github.com/tokio-rs/axum).
+## Screenshots
 
-## Creating your template repo
+[<img src="https://deepgaurav.com/assets/images/projects/tvmate/sc4-1080.avif" height=300>](SC4)
+[<img src="https://deepgaurav.com/assets/images/projects/tvmate/sc5-1080.avif" height=300>](SC5)
+[<img src="https://deepgaurav.com/assets/images/projects/tvmate/sc6-1080.avif" height=300>](SC6)
+[<img src="https://deepgaurav.com/assets/images/projects/tvmate/sc1-1080.avif" height=300>](SC1)
+[<img src="https://deepgaurav.com/assets/images/projects/tvmate/sc2-1080.avif" height=300>](SC2)
+[<img src="https://deepgaurav.com/assets/images/projects/tvmate/sc3-1080.avif" height=300>](SC2)
 
-If you don't have `cargo-leptos` installed you can install it with
+## Overview
 
-```bash
-cargo install cargo-leptos --locked
-```
+TVMate is an innovative application that brings people together through synchronized video watching experiences. Built entirely in Rust, it offers a seamless, cross-device video playback synchronization with a unique retro CRT TV interface.
 
-Then run
-```bash
-cargo leptos new --git https://github.com/leptos-rs/start-axum-workspace/
-```
+## Features
 
-to generate a new project template.
+- **Synchronized Playback**: Watch videos in perfect sync with friends, regardless of device or location.
+- **Audio/Video Chat**: Features Built in Audio/Video chat using WebRTC
+- **Room Creation**: Easily create and join virtual viewing rooms.
+- **Device Compatibility**: Works across various devices, ensuring a wide range of accessibility.
+- **Built-in Chat**: Communicate with fellow viewers in real-time without leaving the app.
+- **Retro CRT TV Aesthetic**: Enjoy a nostalgic viewing experience with our old-school CRT TV inspired design.
+- **Local Video Support**: Select and play videos stored on your local device.
 
-```bash
-cd {projectname}
-```
+## Technical Stack
 
-to go to your newly created project.  
-Feel free to explore the project structure, but the best place to start with your application code is in `src/app.rs`.  
-Addtionally, Cargo.toml may need updating as new versions of the dependencies are released, especially if things are not working after a `cargo update`.
+- **Backend**: Rust with Axum framework for a fast and efficient server.
+- **Frontend**: Leptos, a Rust-based framework for building reactive web applications.
+- **Real-time Communication**: WebSocket for instant synchronization and chat functionality.
 
-### Islands support
+## How It Works
 
-Note that for islands to work correctly, you need to have a `use app;` in your frontend `lib.rs` otherwise rustc / wasm_bindgen gets confused.
-To prevent clippy from complaining, at the top of the `frontend/lib.rs` file place:
-```rust
-#[allow(clippy::single_component_path_imports)]
-#[allow(unused_imports)]
-use app;
-```
+1. Create or join a viewing room.
+2. Select a video from your device.
+3. TVMate synchronizes the video playback across all participants' devices.
+4. Chat and interact with other viewers while enjoying the synchronized content.
 
-## Running your project
+## Benefits
 
-```bash
-cargo leptos watch
-```
+1. **Stay Connected**: Watch videos together, even when physically apart.
+2. **Flexible Viewing**: Use your own device and locally stored videos.
+3. **Nostalgic Experience**: Enjoy modern functionality wrapped in a retro design.
+4. **Seamless Interaction**: Chat and watch simultaneously without switching apps.
 
-## Installing Additional Tools
+Experience the joy of shared viewing with TVMate - where retro meets modern in perfect sync!
 
-By default, `cargo-leptos` uses `nightly` Rust, `cargo-generate`, and `sass`. If you run into any trouble, you may need to install one or more of these tools.
+## License
+[![GNU GPLv3 Image](https://www.gnu.org/graphics/gplv3-127x51.png)](https://www.gnu.org/licenses/gpl-3.0.html)  
 
-1. `rustup toolchain install nightly --allow-downgrade` - make sure you have Rust nightly
-2. `rustup default nightly` - setup nightly as default, or you can use rust-toolchain file later on
-3. `rustup target add wasm32-unknown-unknown` - add the ability to compile Rust to WebAssembly
-4. `cargo install cargo-generate` - install `cargo-generate` binary (should be installed automatically in future)
-5. `npm install -g sass` - install `dart-sass` (should be optional in future
-
-## Compiling for Release
-```bash
-cargo leptos build --release
-```
-
-Will generate your server binary in target/server/release and your site package in target/site
-
-## Testing Your Project
-```bash
-cargo leptos end-to-end
-```
-
-```bash
-cargo leptos end-to-end --release
-```
-
-Cargo-leptos uses Playwright as the end-to-end test tool.  
-Tests are located in end2end/tests directory.
-
-## Executing a Server on a Remote Machine Without the Toolchain
-After running a `cargo leptos build --release` the minimum files needed are:
-
-1. The server binary located in `target/server/release`
-2. The `site` directory and all files within located in `target/site`
-
-Copy these files to your remote server. The directory structure should be:
-```text
-start-axum
-site/
-```
-Set the following enviornment variables (updating for your project as needed):
-```text
-LEPTOS_OUTPUT_NAME="start-axum"
-LEPTOS_SITE_ROOT="site"
-LEPTOS_SITE_PKG_DIR="pkg"
-LEPTOS_SITE_ADDR="127.0.0.1:3000"
-LEPTOS_RELOAD_PORT="3001"
-```
-Finally, run the server binary.
-
-## Licensing
-
-This template itself is released under the Unlicense. You should replace the LICENSE for your own application with an appropriate license if you plan to release it publicly.
+TVMate is Free Software: You can use, study share and improve it at your
+will. Specifically you can redistribute and/or modify it under the terms of the
+[GNU General Public License](https://www.gnu.org/licenses/gpl-3.0.html) as
+published by the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
