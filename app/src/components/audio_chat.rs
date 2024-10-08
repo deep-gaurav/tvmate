@@ -8,6 +8,7 @@ use uuid::Uuid;
 use web_sys::AudioContext;
 
 use crate::components::portal::Portal;
+use crate::components::video_chat::VideoChatManager;
 use crate::networking::room_manager::RoomManager;
 use crate::MountPoints;
 
@@ -125,7 +126,15 @@ pub fn AudioChat() -> impl IntoView {
         }
     });
 
+    let (video_manager_open, set_video_manager_open) = create_signal(false);
+
     view! {
+        <VideoChatManager
+            is_open=video_manager_open
+            close=move|_|{
+                set_video_manager_open.set(false);
+            }
+        />
         {
             move || {
                 if let Some(speaker_point) = speaker_point.get() {
@@ -136,7 +145,15 @@ pub fn AudioChat() -> impl IntoView {
                             mount=el.clone()
                             class="h-full w-full bg-black p-2 flex justify-center flex-col"
                         >
-                            <div class="text-xs "> "Audio Chat" </div>
+                            <button class="text-xs text-center"
+                                on:click=move|_|{
+                                    set_video_manager_open.set(true);
+                                }
+                            >
+                                "Video Call"
+                            </button>
+                            <div class="h-4" />
+                            <div class="text-xs text-center"> "Audio Chat" </div>
                             <div class="h-4" />
                             <div class="flex flex-grow h-full w-full gap-2">
                                 <For

@@ -4,6 +4,10 @@ pub enum Icons {
     Info,
     Tick,
     Close,
+    Mic,
+    MicOff,
+    Video,
+    VideoOff,
 }
 
 impl Icons {
@@ -12,6 +16,10 @@ impl Icons {
             Icons::Info => include_str!("info.svg"),
             Icons::Tick => include_str!("tick.svg"),
             Icons::Close => include_str!("close.svg"),
+            Icons::Mic => include_str!("mic.svg"),
+            Icons::MicOff => include_str!("mic_off.svg"),
+            Icons::Video => include_str!("video.svg"),
+            Icons::VideoOff => include_str!("video_off.svg"),
         }
     }
 }

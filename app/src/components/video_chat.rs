@@ -7,13 +7,22 @@ use leptos_use::{use_window_size, UseWindowSizeReturn};
 use tracing::{info, warn};
 use uuid::Uuid;
 
-use crate::networking::room_manager::RoomManager;
+use crate::{
+    components::{dialog::Dialog, icons::Icon},
+    networking::room_manager::RoomManager,
+};
 
 #[derive(Clone)]
 struct VideoUser {
     user_meta: RwSignal<UserMeta>,
     video_ref: NodeRef<leptos::html::Video>,
     is_video_active: RwSignal<bool>,
+}
+
+impl PartialEq for VideoUser {
+    fn eq(&self, other: &Self) -> bool {
+        self.user_meta == other.user_meta && self.is_video_active == other.is_video_active
+    }
 }
 
 #[component]
@@ -54,9 +63,9 @@ pub fn VideoChat() -> impl IntoView {
     create_effect(move |_| {
         if let Some((user_id, stream)) = video_receiver.get() {
             if let Some(VideoUser {
-                user_meta,
                 video_ref,
                 is_video_active,
+                ..
             }) = video_users.with(|map| map.get(&user_id).cloned())
             {
                 if let Some(video) = video_ref.get_untracked() {
@@ -167,7 +176,7 @@ pub fn VideoChat() -> impl IntoView {
 
     view! {
         <Portal>
-            <div ref=div_ref class="fixed flex flex-col rounded-md cursor-grab z-50 touch-none"
+            <div ref=div_ref class="fixed flex flex-col rounded-md cursor-grab z-50 touch-none overflow-hidden"
 
                 style=move||format!(
                     "left: {}px; top: {}px; width: {}px",
@@ -193,8 +202,9 @@ pub fn VideoChat() -> impl IntoView {
                     let:user_id
                 >
                     {
+                        let user = create_memo(move |_| video_users.get_untracked().get(&user_id).cloned());
                         move ||{
-                            if let Some(user) = video_users.get_untracked().get(&user_id){
+                            if let Some(user) = user.get() {
                                 let video_ref= user.video_ref;
                                 let is_video_active = user.is_video_active;
                                 view! {
@@ -211,5 +221,110 @@ pub fn VideoChat() -> impl IntoView {
                 </For>
             </div>
         </Portal>
+    }
+}
+
+#[component]
+pub fn VideoChatManager(
+    #[prop(into)] is_open: MaybeSignal<bool>,
+    #[prop(into)] close: Callback<()>,
+) -> impl IntoView {
+    let rm = expect_context::<RoomManager>();
+
+    #[derive(Clone, PartialEq, Eq)]
+    struct VideoChatUser {
+        pub meta: RwSignal<UserMeta>,
+        pub is_self: bool,
+    }
+
+    let (video_users, set_video_users) = create_signal(HashMap::<Uuid, VideoChatUser>::new());
+
+    let room_info = rm.get_room_info();
+
+    let owner = Owner::current().expect("No owner");
+    create_effect(move |_| {
+        if let Some(room_info) = room_info.get() {
+            let vu = video_users.get_untracked();
+            let mut new_users = HashMap::new();
+            for user in room_info.users {
+                if let Some(user_v) = vu.get(&user.id) {
+                    let user_id = user.id;
+                    user_v.meta.set(user);
+                    new_users.insert(user_id, user_v.clone());
+                } else {
+                    new_users.insert(
+                        user.id,
+                        VideoChatUser {
+                            is_self: room_info.user_id == user.id,
+                            meta: with_owner(owner, || create_rw_signal(user)),
+                        },
+                    );
+                }
+            }
+            set_video_users.set(new_users);
+        }
+    });
+
+    view! {
+        <Show when=move||is_open.get()>
+            <div class="fixed w-full top-0 left-0 h-full z-50 text-white bg-black/40 flex justify-center items-center">
+                <div class="">
+                    <Dialog
+                        is_self_sized=true
+                        is_open=true
+                        on_close=move|_|{
+                            close.call(());
+                        }
+                    >
+                        <div class="text-center">
+                            "Video/Audio Call"
+                        </div>
+                        <div class="h-4" />
+                        <For
+                            each=move||{
+                                let ids = video_users.get().keys().cloned().collect::<Vec<_>>();
+                                ids
+                            }
+                            key=|id|*id
+                            let:user_id
+                        >
+                            {
+                                let user = create_memo(move |_| video_users.get().get(&user_id).cloned());
+                                if let Some(user) = user.get() {
+                                    let rm = expect_context::<RoomManager>();
+                                    if user.is_self {
+                                        view! {
+
+                                        }.into_view()
+                                    }else{
+                                        view! {
+                                            <div class="flex gap-4 items-center">
+                                                <div class="text-lg"> { move || user.meta.get().name } </div>
+                                                <div class="flex-grow" />
+                                                <div class="flex gap-3">
+                                                    <button class="w-8"
+                                                        on:click=move|_|{
+
+                                                        }
+                                                    >
+                                                        <Icon icon=crate::components::icons::Icons::Video />
+                                                    </button>
+                                                    <button class="w-8">
+                                                        <Icon icon=crate::components::icons::Icons::Mic />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="h-4" />
+                                        }.into_view()
+                                    }
+                                }else{
+                                    view! {}.into_view()
+                                }
+                            }
+                        </For>
+                    </Dialog>
+                </div>
+            </div>
+        </Show>
     }
 }
