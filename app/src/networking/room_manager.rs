@@ -173,8 +173,19 @@ impl RoomManager {
         let (video_rx, video_tx) = with_owner(owner, || create_signal(None));
         let (audio_rx, audio_tx) = with_owner(owner, || create_signal(None));
 
+        let rm = Self {
+            state,
+            room_info_signal,
+            player_message_tx: create_signal(None),
+            audio_chat_stream_signal: (audio_rx, audio_tx),
+            video_chat_stream_signal: (video_rx, video_tx),
+            ice_signal: (ice_read, ice_tx),
+            sdp_signal: (session_description, session_description_tx),
+            owner,
+        };
         with_owner(owner, {
-            let state = state.clone();
+            let rm = rm.clone();
+            let state = rm.state.clone();
             move || {
                 receive_peer_connections(
                     Callback::new(move |_| {
@@ -205,41 +216,23 @@ impl RoomManager {
                         audio_tx.set(Some((user, stream)));
                     }),
                     {
-                        let state = state.clone();
+                        let rm = rm.clone();
                         Callback::new(move |(user, ice)| {
-                            let self_id = room_info_signal
-                                .0
-                                .with_untracked(|room| room.as_ref().map(|r: &RoomInfo| r.user_id));
-                            if let Some(self_id) = self_id {
-                                if let RoomState::Connected(RoomConnectionInfo {
-                                    connection, ..
-                                }) = &*state.borrow()
-                                {
-                                    connection.send(Message::ClientMessage((
-                                        self_id,
-                                        ClientMessage::ExchangeCandidate(user, ice),
-                                    )));
-                                }
-                            }
+                            info!("Send ice {user} {ice:?}");
+                            rm.send_message(
+                                ClientMessage::ExchangeCandidate(user, ice),
+                                SendType::Reliable,
+                            );
                         })
                     },
                     {
-                        let state = state.clone();
+                        let rm = rm.clone();
                         Callback::new(move |(user, sdp)| {
-                            let self_id = room_info_signal
-                                .0
-                                .with_untracked(|room| room.as_ref().map(|r: &RoomInfo| r.user_id));
-                            if let Some(self_id) = self_id {
-                                if let RoomState::Connected(RoomConnectionInfo {
-                                    connection, ..
-                                }) = &*state.borrow()
-                                {
-                                    connection.send(Message::ClientMessage((
-                                        self_id,
-                                        ClientMessage::SendSessionDesc(user, sdp),
-                                    )));
-                                }
-                            }
+                            info!("Send sdp {user} {sdp:?}");
+                            rm.send_message(
+                                ClientMessage::SendSessionDesc(user, sdp),
+                                SendType::Reliable,
+                            );
                         })
                     },
                     ice_read.into(),
@@ -248,16 +241,8 @@ impl RoomManager {
                 );
             }
         });
-        Self {
-            state,
-            room_info_signal,
-            player_message_tx: create_signal(None),
-            audio_chat_stream_signal: (audio_rx, audio_tx),
-            video_chat_stream_signal: (video_rx, video_tx),
-            ice_signal: (ice_read, ice_tx),
-            sdp_signal: (session_description, session_description_tx),
-            owner,
-        }
+
+        rm
     }
 
     pub fn get_room_info(&self) -> ReadSignal<Option<RoomInfo>> {
@@ -539,10 +524,12 @@ impl RoomManager {
                                         warn!("Received send session description")
                                     }
                                     ClientMessage::ExchangeCandidate(_uuid, ice) => {
+                                        info!("Received ice from {from_user} {ice}");
                                         ice_setter.set(Some((from_user, ice)));
                                     }
 
                                     ClientMessage::ReceivedSessionDesc(sdp) => {
+                                        info!("Received sdp from {from_user} {sdp:?}");
                                         sdp_setter.set(Some((from_user, sdp)));
                                     }
                                 },
@@ -687,6 +674,7 @@ impl RoomManager {
     }
 
     pub async fn connect_audio_chat(&self, user: Uuid) {
+        info!("Connect host");
         let rtc_config_peer = if let RoomState::Connected(RoomConnectionInfo {
             rtc_config,
 
@@ -711,6 +699,8 @@ impl RoomManager {
             let state = self.state.clone();
             let video_setter = self.video_chat_stream_signal.1;
             let audio_setter = self.audio_chat_stream_signal.1;
+            info!("Connect to user {user} self_id {}", room_info.user_id);
+            let rm = self.clone();
             leptos::spawn_local(async move {
                 if let Err(err) = connect_to_user(
                     room_info.user_id,
@@ -725,29 +715,22 @@ impl RoomManager {
                         audio_setter.set(Some((id, media)));
                     }),
                     {
-                        let state = state.clone();
+                        let rm = rm.clone();
                         Callback::new(move |ice| {
-                            if let RoomState::Connected(RoomConnectionInfo { connection, .. }) =
-                                &*state.borrow()
-                            {
-                                connection.send(Message::ClientMessage((
-                                    user,
-                                    ClientMessage::ExchangeCandidate(user, ice),
-                                )));
-                            }
+                            info!("Send ice {user} {ice:?}");
+                            rm.send_message(
+                                ClientMessage::ExchangeCandidate(user, ice),
+                                SendType::Reliable,
+                            );
                         })
                     },
                     {
-                        let state = state.clone();
+                        let rm = rm.clone();
                         Callback::new(move |sdp| {
-                            if let RoomState::Connected(RoomConnectionInfo { connection, .. }) =
-                                &*state.borrow()
-                            {
-                                connection.send(Message::ClientMessage((
-                                    user,
-                                    ClientMessage::SendSessionDesc(user, sdp),
-                                )));
-                            }
+                            rm.send_message(
+                                ClientMessage::SendSessionDesc(user, sdp),
+                                SendType::Reliable,
+                            );
                         })
                     },
                     ice_signal.into(),

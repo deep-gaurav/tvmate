@@ -5224,6 +5224,9 @@ dependencies = [
  "leptos",
  "serde",
  "serde-wasm-bindgen 0.6.5",
+ "tracing",
+ "tracing-subscriber",
+ "tracing-subscriber-wasm",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]

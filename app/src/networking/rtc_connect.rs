@@ -103,6 +103,7 @@ pub async fn connect_to_user(
 
     owner: Owner,
 ) -> Result<(), JsValue> {
+    info!("Host user");
     let pc = connect_rtc(rtc_config)?;
 
     with_owner(owner, || {
@@ -110,6 +111,7 @@ pub async fn connect_to_user(
             pc.clone(),
             leptos::ev::Custom::<RtcTrackEvent>::new("track"),
             move |ev| {
+                info!("Host: ev - track");
                 let track = ev.track();
                 if let Ok(stream) = MediaStream::new_with_tracks(&Array::of1(&track)) {
                     if track.kind() == "audio" {
@@ -127,9 +129,10 @@ pub async fn connect_to_user(
             pc.clone(),
             leptos::ev::Custom::<RtcPeerConnectionIceEvent>::new("icecandidate"),
             move |ev| {
+                info!("Host: ev - ice");
                 if let Some(candidate) = ev.candidate() {
                     if let Ok(candidate) = serialize_candidate(candidate) {
-                        info!("Sending ice");
+                        info!("Sending ice host");
                         ice_callback.call(candidate);
                     } else {
                         warn!("Cant serialize candidate")
@@ -147,7 +150,10 @@ pub async fn connect_to_user(
         .dyn_into::<MediaStreamTrack>()
     {
         if let Ok(audio_stream) = MediaStream::new_with_tracks(&Array::of1(&audio)) {
+            info!("Host: set audio");
             audio_media_setter.call((self_id, audio_stream));
+        } else {
+            warn!("Host: Cant make audio");
         }
     }
     if let Ok(video) = local_stream
@@ -156,7 +162,10 @@ pub async fn connect_to_user(
         .dyn_into::<MediaStreamTrack>()
     {
         if let Ok(video_stream) = MediaStream::new_with_tracks(&Array::of1(&video)) {
+            info!("Host: set video");
             video_media_setter.call((self_id, video_stream));
+        } else {
+            warn!("Host: Cant make video");
         }
     }
 
@@ -176,6 +185,7 @@ pub async fn connect_to_user(
             let pc = pc.clone();
             move |_| {
                 if let Some((id, rtcsession_desc)) = session_signal.get() {
+                    info!("Host: received sdp {id} {rtcsession_desc:?}");
                     if id == user {
                         if let Some(rtc_sdp) =
                             RtcSdpType::from_js_value(&JsValue::from_str(&rtcsession_desc.typ))
@@ -198,6 +208,8 @@ pub async fn connect_to_user(
         });
         create_effect(move |_| {
             if let Some((id, candidate)) = ice_signal.get() {
+                info!("Host: received ice {id} {candidate}");
+
                 if id == user {
                     if let Ok(candidate) = deserialize_candidate(&candidate) {
                         let _ =
@@ -234,7 +246,6 @@ pub fn receive_peer_connections(
     let pending_candidates = store_value(HashMap::<Uuid, Vec<RtcIceCandidateInit>>::new());
 
     create_effect(move |_| {
-        info!("Received ice");
         if let Some((from_user, candidate)) = ice_signal.get() {
             if let Ok(candidate) = deserialize_candidate(&candidate) {
                 if let Some(pc) = peers.with_value(|peers| peers.get(&from_user).cloned()) {
@@ -253,7 +264,17 @@ pub fn receive_peer_connections(
 
     create_effect(move |_| {
         if let Some((from_user, rtcsession_desc)) = session_signal.get() {
-            let rtc_config = rtc_config.clone();
+            let Ok(offer_type) =
+                RtcSdpType::from_js_value(&JsValue::from_str(&rtcsession_desc.typ))
+                    .ok_or(JsValue::from_str("cannot convert sdp type"))
+            else {
+                warn!("Cant get offer type");
+                return;
+            };
+            if offer_type != RtcSdpType::Offer {
+                info!("Ignoring {offer_type:?} as it's not offer");
+                return;
+            }
             let Some(self_id) = self_id.call(()) else {
                 return;
             };
@@ -262,9 +283,35 @@ pub fn receive_peer_connections(
             };
             leptos::spawn_local(async move {
                 let (video, audio) = permissions_callback.call(());
+                let pc = match connect_rtc(&rtc_config) {
+                    Ok(pc) => pc,
+                    Err(er) => {
+                        warn!("Cant create pc {er:?}");
+                        return;
+                    }
+                };
+
+                with_owner(owner, || {
+                    let _ = use_event_listener(
+                        pc.clone(),
+                        leptos::ev::Custom::<RtcTrackEvent>::new("track"),
+                        move |ev| {
+                            info!("Peer: ev: track");
+                            let track = ev.track();
+                            if let Ok(stream) = MediaStream::new_with_tracks(&Array::of1(&track)) {
+                                if track.kind() == "audio" {
+                                    audio_media_setter.call((from_user, stream));
+                                } else {
+                                    video_media_setter.call((from_user, stream));
+                                }
+                            }
+                        },
+                    );
+                });
+
                 match accept_peer_connection(
                     self_id,
-                    &rtc_config,
+                    &pc,
                     rtcsession_desc,
                     video,
                     audio,
@@ -273,7 +320,7 @@ pub fn receive_peer_connections(
                 )
                 .await
                 {
-                    Ok((pc, answer)) => {
+                    Ok(answer) => {
                         if let Some(candidates) =
                             pending_candidates.with_value(|pc| pc.get(&from_user).cloned())
                         {
@@ -281,6 +328,7 @@ pub fn receive_peer_connections(
                                 pc.remove(&from_user);
                             });
                             for candidate in candidates {
+                                info!("Add ice to pc");
                                 let _ = pc.add_ice_candidate_with_opt_rtc_ice_candidate_init(Some(
                                     &candidate,
                                 ));
@@ -296,29 +344,10 @@ pub fn receive_peer_connections(
                                 move |ev| {
                                     if let Some(candidate) = ev.candidate() {
                                         if let Ok(candidate) = serialize_candidate(candidate) {
-                                            info!("Sending ice");
+                                            info!("Sending ice receiver");
                                             ice_callback.call((from_user, candidate));
                                         } else {
                                             warn!("Cant serialize candidate")
-                                        }
-                                    }
-                                },
-                            );
-                        });
-
-                        with_owner(owner, || {
-                            let _ = use_event_listener(
-                                pc.clone(),
-                                leptos::ev::Custom::<RtcTrackEvent>::new("track"),
-                                move |ev| {
-                                    let track = ev.track();
-                                    if let Ok(stream) =
-                                        MediaStream::new_with_tracks(&Array::of1(&track))
-                                    {
-                                        if track.kind() == "audio" {
-                                            audio_media_setter.call((from_user, stream));
-                                        } else {
-                                            video_media_setter.call((from_user, stream));
                                         }
                                     }
                                 },
@@ -343,16 +372,14 @@ pub fn receive_peer_connections(
 async fn accept_peer_connection(
     self_id: Uuid,
 
-    rtc_config: &RtcConfig,
+    pc: &RtcPeerConnection,
     rtc_session_desc: RTCSessionDesc,
 
     video: bool,
     audio: bool,
     video_media_setter: Callback<(Uuid, MediaStream), ()>,
     audio_media_setter: Callback<(Uuid, MediaStream), ()>,
-) -> Result<(RtcPeerConnection, RTCSessionDesc), JsValue> {
-    let pc = connect_rtc(rtc_config)?;
-
+) -> Result<RTCSessionDesc, JsValue> {
     let local_stream = add_media_tracks(&pc, video, audio).await?;
 
     if let Ok(audio) = local_stream
@@ -385,13 +412,10 @@ async fn accept_peer_connection(
 
     wasm_bindgen_futures::JsFuture::from(pc.set_local_description(&answer)).await?;
 
-    Ok((
-        pc,
-        RTCSessionDesc {
-            typ: JsValue::from(answer.get_type())
-                .as_string()
-                .expect("sdp type not string"),
-            sdp: answer.get_sdp().expect("No sdp"),
-        },
-    ))
+    Ok(RTCSessionDesc {
+        typ: JsValue::from(answer.get_type())
+            .as_string()
+            .expect("sdp type not string"),
+        sdp: answer.get_sdp().expect("No sdp"),
+    })
 }
