@@ -48,11 +48,7 @@ pub fn deserialize_candidate(candidate: &str) -> Result<RtcIceCandidateInit, JsV
     Ok(obj.unchecked_into())
 }
 
-pub async fn add_media_tracks(
-    pc: &RtcPeerConnection,
-    video: bool,
-    audio: bool,
-) -> Result<MediaStream, JsValue> {
+pub async fn get_media_stream(video: bool, audio: bool) -> Result<MediaStream, JsValue> {
     let user_media = window()
         .unwrap()
         .navigator()
@@ -67,6 +63,15 @@ pub async fn add_media_tracks(
     let media_stream = wasm_bindgen_futures::JsFuture::from(user_media)
         .await?
         .dyn_into::<MediaStream>()?;
+    Ok(media_stream)
+}
+
+pub async fn add_media_tracks(
+    pc: &RtcPeerConnection,
+    video: bool,
+    audio: bool,
+) -> Result<MediaStream, JsValue> {
+    let media_stream = get_media_stream(video, audio).await?;
 
     for track in media_stream.get_audio_tracks() {
         info!("Add Audio track");
@@ -229,7 +234,7 @@ pub fn receive_peer_connections(
     self_id: Callback<(), Option<Uuid>>,
     rtc_config: Callback<(), Option<RtcConfig>>,
 
-    permissions_callback: Callback<(), (bool, bool)>,
+    permissions_callback: Callback<Uuid, (bool, bool)>,
 
     video_media_setter: Callback<(Uuid, MediaStream), ()>,
     audio_media_setter: Callback<(Uuid, MediaStream), ()>,
@@ -282,7 +287,11 @@ pub fn receive_peer_connections(
                 return;
             };
             leptos::spawn_local(async move {
-                let (video, audio) = permissions_callback.call(());
+                let (video, audio) = permissions_callback.call(from_user);
+                if !video && !audio {
+                    warn!("permissions not gived for video and audio");
+                    return;
+                }
                 let pc = match connect_rtc(&rtc_config) {
                     Ok(pc) => pc,
                     Err(er) => {

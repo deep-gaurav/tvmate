@@ -8,7 +8,11 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::{
-    components::{dialog::Dialog, icons::Icon},
+    components::{
+        dialog::Dialog,
+        icons::Icon,
+        toaster::{Toast, Toaster},
+    },
     networking::room_manager::RoomManager,
 };
 
@@ -266,6 +270,8 @@ pub fn VideoChatManager(
     });
 
     view! {
+        <VideoChatConsent />
+
         <Show when=move||is_open.get()>
             <div class="fixed w-full top-0 left-0 h-full z-50 text-white bg-black/40 flex justify-center items-center">
                 <div class="">
@@ -326,5 +332,99 @@ pub fn VideoChatManager(
                 </div>
             </div>
         </Show>
+    }
+}
+
+#[component]
+pub fn VideoChatConsent() -> impl IntoView {
+    let rm = expect_context::<RoomManager>();
+    let video_permission_req = rm.permission_request_signal;
+    let (request, set_request) = create_signal(None);
+
+    create_effect(move |_| {
+        if let Some((user, video, audio)) = video_permission_req.get() {
+            let user = rm
+                .get_room_info()
+                .with_untracked(|r| {
+                    r.as_ref()
+                        .map(|r| r.users.iter().find(|u| u.id == user).cloned())
+                })
+                .flatten();
+            if let Some(user) = user {
+                if video || audio {
+                    set_request.set(Some((user, video, audio)));
+                }
+            }
+        }
+    });
+
+    view! {
+        {
+            move || {
+                if let Some(request) = request.get() {
+                    view! {
+                        <div class="fixed w-full top-0 left-0 h-full z-50 text-white bg-black/40 flex justify-center items-center">
+                            <div class="">
+                                <Dialog
+                                    is_self_sized=true
+                                    is_open=true
+                                    on_close=move|_|{
+                                        set_request.set(None);
+                                    }
+                                >
+                                    <div class="text-center text-lg">
+                                        {if request.1 { "Video"} else {"Audio"}} " Call Request"
+                                    </div>
+                                    <div class="h-4" />
+                                    <div class="flex gap-2 text-center items-center justify-center">
+                                        <span class="w-6">
+                                            <Icon icon={if request.1 {crate::components::icons::Icons::Video}else {crate::components::icons::Icons::Mic}} />
+                                        </span>
+                                        <span>
+                                            {request.0.name}
+                                        </span>
+                                    </div>
+                                    <div class="h-6" />
+                                    <div class="flex gap-4">
+                                        <button
+                                           class="text-sm hover:bg-white/20 self-center px-4 py-1"
+                                            type="button"
+                                            on:click=move|_|{
+                                                let rm = expect_context::<RoomManager>();
+                                                let toaster = expect_context::<Toaster>();
+                                                leptos::spawn_local(async move {
+                                                    let res = rm.connect_audio_chat(request.0.id, request.1, request.2).await;
+                                                    if let Err(err) = res {
+                                                        toaster.toast(Toast{
+                                                            message: format!("{err:?}").into(),
+                                                            r#type:crate::components::toaster::ToastType::Failed
+                                                        });
+                                                    }
+                                                });
+                                            }
+                                        >
+                                            "[ Accept ]"
+                                        </button>
+
+                                        <button
+                                           class="text-sm hover:bg-white/20 self-center px-4 py-1"
+                                            type="button"
+                                            on:click=move|_|{
+                                                set_request.set(None);
+                                            }
+                                        >
+                                            "[ Reject ]"
+                                        </button>
+                                    </div>
+
+                                </Dialog>
+                            </div>
+                        </div>
+                    }.into_view()
+                }else{
+                    view! {}.into_view()
+                }
+            }
+        }
     }
 }

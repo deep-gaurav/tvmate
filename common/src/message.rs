@@ -21,7 +21,7 @@ pub enum ClientMessage {
     SendSessionDesc(Uuid, RTCSessionDesc),
     ReceivedSessionDesc(RTCSessionDesc),
     ExchangeCandidate(Uuid, String),
-    // RequestCall(Uuid, bool, bool),
+    RequestCall(Uuid, bool, bool),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

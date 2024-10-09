@@ -1,4 +1,5 @@
 use leptos::*;
+use logging::warn;
 use tracing::info;
 
 use crate::components::portal::Portal;
@@ -43,8 +44,9 @@ pub fn RoomInfo() -> impl IntoView {
                                             on:click=move |_| {
                                                 let rm = expect_context::<RoomManager>();
                                                 leptos::spawn_local(async move {
-                                                    info!("RM Connect audio chat");
-                                                    rm.connect_audio_chat(user.id).await;
+                                                    if let Err(err) =  rm.send_vc_request(user.id, true, true).await{
+                                                        warn!("Failed to send vc request {err:?}")
+                                                    }
                                                 });
                                             }
                                             class="text-left w-full mt-2 break-words"

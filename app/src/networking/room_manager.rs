@@ -34,7 +34,7 @@ use crate::{
     Endpoint,
 };
 
-use super::rtc_connect::{connect_to_user, receive_peer_connections};
+use super::rtc_connect::{connect_to_user, get_media_stream, receive_peer_connections};
 
 #[derive(Clone)]
 pub struct RoomManager {
@@ -60,6 +60,10 @@ pub struct RoomManager {
         ReadSignal<Option<(Uuid, RTCSessionDesc)>>,
         WriteSignal<Option<(Uuid, RTCSessionDesc)>>,
     ),
+    pub vc_permission: StoredValue<HashMap<Uuid, (bool, bool)>>,
+
+    pub permission_request_signal: Signal<Option<(Uuid, bool, bool)>>,
+    permission_request_sender: WriteSignal<Option<(Uuid, bool, bool)>>,
     owner: Owner,
 }
 
@@ -172,6 +176,9 @@ impl RoomManager {
         let (session_description, session_description_tx) = create_signal(None);
         let (video_rx, video_tx) = with_owner(owner, || create_signal(None));
         let (audio_rx, audio_tx) = with_owner(owner, || create_signal(None));
+        let vc_permission = store_value(HashMap::new());
+
+        let (permissions_rx, permissions_tx) = create_signal(None);
 
         let rm = Self {
             state,
@@ -182,6 +189,9 @@ impl RoomManager {
             ice_signal: (ice_read, ice_tx),
             sdp_signal: (session_description, session_description_tx),
             owner,
+            vc_permission,
+            permission_request_sender: permissions_tx,
+            permission_request_signal: permissions_rx.into(),
         };
         with_owner(owner, {
             let rm = rm.clone();
@@ -208,7 +218,11 @@ impl RoomManager {
                             rtc_config_peer.map(|s| s.get_value())
                         })
                     },
-                    Callback::new(move |_| (true, true)),
+                    Callback::new(move |user_id| {
+                        vc_permission
+                            .with_value(|p| p.get(&user_id).cloned())
+                            .unwrap_or((false, false))
+                    }),
                     Callback::new(move |(user, stream)| {
                         video_tx.set(Some((user, stream)));
                     }),
@@ -347,6 +361,8 @@ impl RoomManager {
 
                     let ice_setter = self.ice_signal.1;
                     let sdp_setter = self.sdp_signal.1;
+
+                    let permission_request_notifier = self.permission_request_sender;
 
                     create_effect(move |_| {
                         let message = message.get();
@@ -532,6 +548,11 @@ impl RoomManager {
                                         info!("Received sdp from {from_user} {sdp:?}");
                                         sdp_setter.set(Some((from_user, sdp)));
                                     }
+                                    ClientMessage::RequestCall(_, video, audio) => {
+                                        info!("Receivedd vc request");
+                                        permission_request_notifier
+                                            .set(Some((from_user, video, audio)));
+                                    }
                                 },
                             }
                         } else {
@@ -673,7 +694,31 @@ impl RoomManager {
         }
     }
 
-    pub async fn connect_audio_chat(&self, user: Uuid) {
+    pub async fn send_vc_request(
+        &self,
+        user: Uuid,
+        video: bool,
+        audio: bool,
+    ) -> Result<(), JsValue> {
+        let _ = get_media_stream(video, audio).await?;
+        info!("Got permissions");
+        self.send_message(
+            ClientMessage::RequestCall(user, video, audio),
+            SendType::Reliable,
+        );
+        self.vc_permission.update_value(|perms| {
+            perms.insert(user, (video, audio));
+        });
+        info!("Sent vc request");
+        Ok(())
+    }
+
+    pub async fn connect_audio_chat(
+        &self,
+        user: Uuid,
+        video: bool,
+        audio: bool,
+    ) -> Result<(), JsValue> {
         info!("Connect host");
         let rtc_config_peer = if let RoomState::Connected(RoomConnectionInfo {
             rtc_config,
@@ -688,7 +733,7 @@ impl RoomManager {
         };
 
         let Some(room_info) = self.get_room_info().get_untracked() else {
-            return;
+            return Err(JsValue::from_str("Room not connected"));
         };
 
         if let Some((rtc_config, rtc_peers)) = rtc_config_peer {
@@ -701,47 +746,45 @@ impl RoomManager {
             let audio_setter = self.audio_chat_stream_signal.1;
             info!("Connect to user {user} self_id {}", room_info.user_id);
             let rm = self.clone();
-            leptos::spawn_local(async move {
-                if let Err(err) = connect_to_user(
-                    room_info.user_id,
-                    user,
-                    &rtc_config.get_value(),
-                    true,
-                    true,
-                    Callback::new(move |(id, stream)| {
-                        video_setter.set(Some((id, stream)));
-                    }),
-                    Callback::new(move |(id, media)| {
-                        audio_setter.set(Some((id, media)));
-                    }),
-                    {
-                        let rm = rm.clone();
-                        Callback::new(move |ice| {
-                            info!("Send ice {user} {ice:?}");
-                            rm.send_message(
-                                ClientMessage::ExchangeCandidate(user, ice),
-                                SendType::Reliable,
-                            );
-                        })
-                    },
-                    {
-                        let rm = rm.clone();
-                        Callback::new(move |sdp| {
-                            rm.send_message(
-                                ClientMessage::SendSessionDesc(user, sdp),
-                                SendType::Reliable,
-                            );
-                        })
-                    },
-                    ice_signal.into(),
-                    session_signal.into(),
-                    owner,
-                )
-                .await
+            connect_to_user(
+                room_info.user_id,
+                user,
+                &rtc_config.get_value(),
+                video,
+                audio,
+                Callback::new(move |(id, stream)| {
+                    video_setter.set(Some((id, stream)));
+                }),
+                Callback::new(move |(id, media)| {
+                    audio_setter.set(Some((id, media)));
+                }),
                 {
-                    warn!("Cannot connect to rtc {err:?}");
-                }
-            });
+                    let rm = rm.clone();
+                    Callback::new(move |ice| {
+                        info!("Send ice {user} {ice:?}");
+                        rm.send_message(
+                            ClientMessage::ExchangeCandidate(user, ice),
+                            SendType::Reliable,
+                        );
+                    })
+                },
+                {
+                    let rm = rm.clone();
+                    Callback::new(move |sdp| {
+                        rm.send_message(
+                            ClientMessage::SendSessionDesc(user, sdp),
+                            SendType::Reliable,
+                        );
+                    })
+                },
+                ice_signal.into(),
+                session_signal.into(),
+                owner,
+            )
+            .await?;
+            Ok(())
+        } else {
+            Err(JsValue::from_str("Room not connected"))
         }
     }
 }

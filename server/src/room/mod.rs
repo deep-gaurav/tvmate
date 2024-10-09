@@ -210,6 +210,16 @@ async fn handle_websocket(
                                                                         }
                                                                     }
                                                                 },
+                                                                common::message::ClientMessage::RequestCall(uuid, video,audio) => {
+                                                                    let sender = app_state.rooms.with_room(room_id, |room| {
+                                                                        room.users.iter().find(|user|user.meta.id == *uuid).map(|user| user.sender.clone())
+                                                                    }).await.flatten();
+                                                                    if let Some(sender) = sender {
+                                                                        if let Err(err) = sender.send(Message::ClientMessage((*sender_id, ClientMessage::RequestCall(*sender_id, *video, *audio)))).await{
+                                                                            warn!("Failed send session desc {err:?}");
+                                                                        }
+                                                                    }
+                                                                },
                                                                 common::message::ClientMessage::ReceivedSessionDesc(_rtcsession_desc) => {
                                                                     warn!("Shouldnt receive received desc");
                                                                 },
