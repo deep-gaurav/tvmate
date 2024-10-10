@@ -330,6 +330,7 @@ pub fn VideoChatManager(
                                                             let toaster = expect_context::<Toaster>();
                                                             leptos::spawn_local(async move {
                                                                 if let Err(err) =  rm.send_vc_request(user.meta.get_untracked().id, false, true).await{
+                                                                    warn!("Failed to send vc request {err:?}");
                                                                     toaster.toast(Toast { message: "Failed to audio call".into(), r#type: crate::components::toaster::ToastType::Failed });
                                                                 }else{
                                                                     toaster.toast(Toast { message: "Sent auio call request".into(), r#type: crate::components::toaster::ToastType::Success });
