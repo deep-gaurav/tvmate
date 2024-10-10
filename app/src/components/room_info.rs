@@ -40,15 +40,7 @@ pub fn RoomInfo() -> impl IntoView {
                                 .into_iter()
                                 .map(|user| {
                                     view! {
-                                        <button
-                                            on:click=move |_| {
-                                                let rm = expect_context::<RoomManager>();
-                                                leptos::spawn_local(async move {
-                                                    if let Err(err) =  rm.send_vc_request(user.id, true, true).await{
-                                                        warn!("Failed to send vc request {err:?}")
-                                                    }
-                                                });
-                                            }
+                                        <div
                                             class="text-left w-full mt-2 break-words"
                                         >
                                             "> "
@@ -57,7 +49,7 @@ pub fn RoomInfo() -> impl IntoView {
                                                 common::UserState::VideoNotSelected => "⌛",
                                                 common::UserState::VideoSelected(_) => "✔️",
                                             }}
-                                        </button>
+                                        </div>
                                     }
                                 })
                                 .collect::<Vec<_>>()

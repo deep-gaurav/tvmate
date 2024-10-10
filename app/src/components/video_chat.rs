@@ -297,7 +297,6 @@ pub fn VideoChatManager(
                             {
                                 let user = create_memo(move |_| video_users.get().get(&user_id).cloned());
                                 if let Some(user) = user.get() {
-                                    let rm = expect_context::<RoomManager>();
                                     if user.is_self {
                                         view! {
 
@@ -310,12 +309,35 @@ pub fn VideoChatManager(
                                                 <div class="flex gap-3">
                                                     <button class="w-8"
                                                         on:click=move|_|{
-
+                                                            let rm = expect_context::<RoomManager>();
+                                                            let toaster = expect_context::<Toaster>();
+                                                            leptos::spawn_local(async move {
+                                                                if let Err(err) =  rm.send_vc_request(user.meta.get_untracked().id, true, true).await{
+                                                                    warn!("Failed to send vc request {err:?}");
+                                                                    toaster.toast(Toast { message: "Failed to video call".into(), r#type: crate::components::toaster::ToastType::Failed });
+                                                                }else{
+                                                                    toaster.toast(Toast { message: "Sent video call request".into(), r#type: crate::components::toaster::ToastType::Success });
+                                                                    close.call(());
+                                                                }
+                                                            });
                                                         }
                                                     >
                                                         <Icon icon=crate::components::icons::Icons::Video />
                                                     </button>
-                                                    <button class="w-8">
+                                                    <button class="w-8"
+                                                        on:click=move|_|{
+                                                            let rm = expect_context::<RoomManager>();
+                                                            let toaster = expect_context::<Toaster>();
+                                                            leptos::spawn_local(async move {
+                                                                if let Err(err) =  rm.send_vc_request(user.meta.get_untracked().id, false, true).await{
+                                                                    toaster.toast(Toast { message: "Failed to audio call".into(), r#type: crate::components::toaster::ToastType::Failed });
+                                                                }else{
+                                                                    toaster.toast(Toast { message: "Sent auio call request".into(), r#type: crate::components::toaster::ToastType::Success });
+                                                                    close.call(());
+                                                                }
+                                                            });
+                                                        }
+                                                    >
                                                         <Icon icon=crate::components::icons::Icons::Mic />
                                                     </button>
                                                 </div>
