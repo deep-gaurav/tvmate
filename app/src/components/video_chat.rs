@@ -422,6 +422,8 @@ pub fn VideoChatConsent() -> impl IntoView {
                                                             message: format!("{err:?}").into(),
                                                             r#type:crate::components::toaster::ToastType::Failed
                                                         });
+                                                    }else{
+                                                        set_request.set(None);
                                                     }
                                                 });
                                             }

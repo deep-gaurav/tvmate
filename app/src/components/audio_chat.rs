@@ -153,8 +153,6 @@ pub fn AudioChat() -> impl IntoView {
                                 "Video Call"
                             </button>
                             <div class="h-4" />
-                            <div class="text-xs text-center"> "Audio Chat" </div>
-                            <div class="h-4" />
                             <div class="flex flex-grow h-full w-full gap-2">
                                 <For
                                     each=move||users.get()
