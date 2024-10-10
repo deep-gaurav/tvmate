@@ -52,6 +52,10 @@ pub struct RoomManager {
         ReadSignal<Option<(Uuid, MediaStream)>>,
         WriteSignal<Option<(Uuid, MediaStream)>>,
     ),
+    pub rtc_signal: (
+        ReadSignal<Option<(Uuid, RtcPeerConnection)>>,
+        WriteSignal<Option<(Uuid, RtcPeerConnection)>>,
+    ),
     pub ice_signal: (
         ReadSignal<Option<(Uuid, String)>>,
         WriteSignal<Option<(Uuid, String)>>,
@@ -176,6 +180,7 @@ impl RoomManager {
         let (session_description, session_description_tx) = create_signal(None);
         let (video_rx, video_tx) = with_owner(owner, || create_signal(None));
         let (audio_rx, audio_tx) = with_owner(owner, || create_signal(None));
+        let (rtc_rx, rtc_tx) = with_owner(owner, || create_signal(None));
         let vc_permission = store_value(HashMap::new());
 
         let (permissions_rx, permissions_tx) = create_signal(None);
@@ -192,6 +197,7 @@ impl RoomManager {
             vc_permission,
             permission_request_sender: permissions_tx,
             permission_request_signal: permissions_rx.into(),
+            rtc_signal: (rtc_rx, rtc_tx),
         };
         with_owner(owner, {
             let rm = rm.clone();
@@ -228,6 +234,9 @@ impl RoomManager {
                     }),
                     Callback::new(move |(user, stream)| {
                         audio_tx.set(Some((user, stream)));
+                    }),
+                    Callback::new(move |(user, pc)| {
+                        rtc_tx.set(Some((user, pc)));
                     }),
                     {
                         let rm = rm.clone();
@@ -744,6 +753,7 @@ impl RoomManager {
             let state = self.state.clone();
             let video_setter = self.video_chat_stream_signal.1;
             let audio_setter = self.audio_chat_stream_signal.1;
+            let rtc_setter = self.rtc_signal.1;
             info!("Connect to user {user} self_id {}", room_info.user_id);
             let rm = self.clone();
             connect_to_user(
@@ -757,6 +767,9 @@ impl RoomManager {
                 }),
                 Callback::new(move |(id, media)| {
                     audio_setter.set(Some((id, media)));
+                }),
+                Callback::new(move |(id, pc)| {
+                    rtc_setter.set(Some((id, pc)));
                 }),
                 {
                     let rm = rm.clone();

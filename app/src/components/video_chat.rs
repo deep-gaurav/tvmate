@@ -6,6 +6,7 @@ use leptos::*;
 use leptos_use::{use_window_size, UseWindowSizeReturn};
 use tracing::{info, warn};
 use uuid::Uuid;
+use web_sys::RtcPeerConnection;
 
 use crate::{
     components::{
@@ -239,6 +240,7 @@ pub fn VideoChatManager(
     struct VideoChatUser {
         pub meta: RwSignal<UserMeta>,
         pub is_self: bool,
+        pub connection: RwSignal<Option<RtcPeerConnection>>,
     }
 
     let (video_users, set_video_users) = create_signal(HashMap::<Uuid, VideoChatUser>::new());
@@ -261,11 +263,23 @@ pub fn VideoChatManager(
                         VideoChatUser {
                             is_self: room_info.user_id == user.id,
                             meta: with_owner(owner, || create_rw_signal(user)),
+                            connection: with_owner(owner, || create_rw_signal(None)),
                         },
                     );
                 }
             }
             set_video_users.set(new_users);
+        }
+    });
+
+    let rtc_getter = rm.rtc_signal.0;
+    create_effect(move |_| {
+        if let Some((user, pc)) = rtc_getter.get() {
+            let mut vu = video_users.get_untracked();
+            if let Some(entry) = vu.get_mut(&user) {
+                entry.connection.set(Some(pc));
+            }
+            set_video_users.set(vu);
         }
     });
 
@@ -305,9 +319,9 @@ pub fn VideoChatManager(
                                         view! {
                                             <div class="flex gap-4 items-center">
                                                 <div class="text-lg"> { move || user.meta.get().name } </div>
-                                                <div class="flex-grow" />
+                                                <div class="flex-grow min-w-6" />
                                                 <div class="flex gap-3">
-                                                    <button class="w-8"
+                                                    <button class="flex flex-row hover:bg-white/20 px-4 py-1 gap-2 items-center"
                                                         on:click=move|_|{
                                                             let rm = expect_context::<RoomManager>();
                                                             let toaster = expect_context::<Toaster>();
@@ -322,9 +336,11 @@ pub fn VideoChatManager(
                                                             });
                                                         }
                                                     >
-                                                        <Icon icon=crate::components::icons::Icons::Video />
+                                                        "[ "
+                                                        <Icon class="w-8" icon=crate::components::icons::Icons::Video />
+                                                        " Video ]"
                                                     </button>
-                                                    <button class="w-8"
+                                                    <button class="flex flex-row hover:bg-white/20 px-4 py-1 gap-2 items-center"
                                                         on:click=move|_|{
                                                             let rm = expect_context::<RoomManager>();
                                                             let toaster = expect_context::<Toaster>();
@@ -339,8 +355,28 @@ pub fn VideoChatManager(
                                                             });
                                                         }
                                                     >
-                                                        <Icon icon=crate::components::icons::Icons::Mic />
+                                                        "[ "
+                                                        <Icon class="w-8" icon=crate::components::icons::Icons::Mic />
+                                                        " Audio ]"
                                                     </button>
+
+                                                    {
+                                                        move || if let Some(pc) = user.connection.get(){
+                                                            view! {
+                                                                <button class="flex flex-row hover:bg-white/20 px-4 py-1 gap-2 items-center"
+                                                                    on:click=move|_|{
+                                                                        pc.close();
+                                                                    }
+                                                                >
+                                                                    "[ "
+                                                                    <Icon class="w-8" icon=crate::components::icons::Icons::CallEnd />
+                                                                    " End Call ]"
+                                                                </button>
+                                                            }.into_view()
+                                                        }else {
+                                                            view! {}.into_view()
+                                                        }
+                                                    }
                                                 </div>
                                             </div>
                                             <div class="h-4" />

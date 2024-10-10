@@ -13,7 +13,8 @@ use web_sys::{
     js_sys::{Array, JSON},
     window, MediaStream, MediaStreamConstraints, MediaStreamTrack, RtcConfiguration,
     RtcIceCandidate, RtcIceCandidateInit, RtcIceServer, RtcPeerConnection,
-    RtcPeerConnectionIceEvent, RtcSdpType, RtcSessionDescriptionInit, RtcTrackEvent,
+    RtcPeerConnectionIceEvent, RtcPeerConnectionState, RtcSdpType, RtcSessionDescriptionInit,
+    RtcTrackEvent,
 };
 
 pub fn connect_rtc(rtc_config: &RtcConfig) -> Result<RtcPeerConnection, JsValue> {
@@ -99,6 +100,7 @@ pub async fn connect_to_user(
     audio: bool,
     video_media_setter: Callback<(Uuid, MediaStream), ()>,
     audio_media_setter: Callback<(Uuid, MediaStream), ()>,
+    rtc_setter: Callback<(Uuid, RtcPeerConnection), ()>,
 
     ice_callback: Callback<String>,
     session_callback: Callback<RTCSessionDesc>,
@@ -123,6 +125,22 @@ pub async fn connect_to_user(
                         audio_media_setter.call((user, stream));
                     } else {
                         video_media_setter.call((user, stream));
+                    }
+                }
+            },
+        );
+    });
+
+    with_owner(owner, || {
+        let _ = use_event_listener(
+            pc.clone(),
+            leptos::ev::Custom::<leptos::ev::Event>::new("connectionstatechange"),
+            {
+                let pc = pc.clone();
+                move |_| {
+                    let connection = pc.connection_state();
+                    if connection == RtcPeerConnectionState::Connected {
+                        rtc_setter.call((user, pc.clone()));
                     }
                 }
             },
@@ -238,6 +256,7 @@ pub fn receive_peer_connections(
 
     video_media_setter: Callback<(Uuid, MediaStream), ()>,
     audio_media_setter: Callback<(Uuid, MediaStream), ()>,
+    rtc_setter: Callback<(Uuid, RtcPeerConnection), ()>,
 
     ice_callback: Callback<(Uuid, String)>,
     session_callback: Callback<(Uuid, RTCSessionDesc)>,
@@ -343,6 +362,24 @@ pub fn receive_peer_connections(
                                 ));
                             }
                         }
+
+                        with_owner(owner, || {
+                            let _ = use_event_listener(
+                                pc.clone(),
+                                leptos::ev::Custom::<leptos::ev::Event>::new(
+                                    "connectionstatechange",
+                                ),
+                                {
+                                    let pc = pc.clone();
+                                    move |_| {
+                                        let connection = pc.connection_state();
+                                        if connection == RtcPeerConnectionState::Connected {
+                                            rtc_setter.call((from_user, pc.clone()));
+                                        }
+                                    }
+                                },
+                            );
+                        });
 
                         with_owner(owner, || {
                             let _ = use_event_listener(

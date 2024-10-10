@@ -97,6 +97,7 @@ features = [
     "RtcIceCandidate",
     "RtcIceCandidateInit",
     "RtcTrackEvent",
+    "RtcPeerConnectionState",
 
     "AudioContext",
     "AnalyserNode",
