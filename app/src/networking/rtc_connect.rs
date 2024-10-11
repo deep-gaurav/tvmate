@@ -84,11 +84,6 @@ pub async fn add_media_tracks(
         pc.add_track(&track, &ms, &Array::new());
     }
 
-    let offer = wasm_bindgen_futures::JsFuture::from(pc.create_offer()).await?;
-    let offer = offer.unchecked_into::<RtcSessionDescriptionInit>();
-
-    wasm_bindgen_futures::JsFuture::from(pc.set_local_description(&offer)).await?;
-
     Ok(())
 }
 
