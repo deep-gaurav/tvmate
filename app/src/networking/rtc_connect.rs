@@ -185,6 +185,14 @@ where
 
     let (video_track, audio_track) = self_video_cb.call((video, audio)).await;
 
+    if video && video_track.is_none() {
+        return Err(JsValue::from_str("Cannot get video"));
+    }
+
+    if audio && audio_track.is_none() {
+        return Err(JsValue::from_str("Cannot get video"));
+    }
+
     if let Some(audio) = audio_track.clone() {
         if let Ok(audio_stream) = MediaStream::new_with_tracks(&Array::of1(&audio)) {
             info!("Host: set audio");

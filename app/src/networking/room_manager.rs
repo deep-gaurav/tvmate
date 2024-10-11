@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, marker::PhantomData, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, future::Future, marker::PhantomData, rc::Rc};
 
 use codee::binary::BincodeSerdeCodec;
 use common::{
@@ -237,55 +237,8 @@ impl RoomManager {
                             .with_value(|p| p.get(&user_id).cloned())
                             .unwrap_or((false, false))
                     }),
-                    Callback::new(move |(video, audio)| {
-                        let mut video_stream = None;
-                        let mut audio_stream = None;
-                        if video {
-                            video_stream = self_video.get_untracked();
-                        }
-                        if audio {
-                            audio_stream = self_audio.get_untracked();
-                        }
-
-                        let is_video_left = video && video_stream.is_none();
-                        let is_audio_left = audio && audio_stream.is_none();
-                        async move {
-                            if is_audio_left || is_video_left {
-                                let remaining =
-                                    get_media_stream(is_video_left, is_audio_left).await;
-
-                                match remaining {
-                                    Ok(stream) => {
-                                        info!("Total tracks :{}", stream.get_tracks().length());
-                                        let audio = stream
-                                            .get_audio_tracks()
-                                            .get(0)
-                                            .dyn_into::<MediaStreamTrack>();
-                                        if let Ok(audio) = audio {
-                                            self_audio.update(|u| *u = Some(audio.clone()));
-                                            audio_stream = Some(audio);
-                                        }
-
-                                        let video = stream
-                                            .get_video_tracks()
-                                            .get(0)
-                                            .dyn_into::<MediaStreamTrack>();
-                                        if let Ok(video) = video {
-                                            self_video.update(|u| *u = Some(video.clone()));
-
-                                            video_stream = Some(video);
-                                        }
-                                        (video_stream, audio_stream)
-                                    }
-                                    Err(err) => {
-                                        warn!("Could get media {err:?}");
-                                        (None, None)
-                                    }
-                                }
-                            } else {
-                                (video_stream, audio_stream)
-                            }
-                        }
+                    Callback::new(move |(video, audio)| async move {
+                        Self::get_video_audio_cb(video, audio, self_video, self_audio).await
                     }),
                     Callback::new(move |(user, stream)| {
                         video_tx.set(Some((user, stream)));
@@ -332,6 +285,59 @@ impl RoomManager {
 
     pub fn get_player_messages(&self) -> ReadSignal<Option<PlayerMessages>> {
         self.player_message_tx.0
+    }
+
+    async fn get_video_audio_cb(
+        video: bool,
+        audio: bool,
+        self_video: RwSignal<Option<MediaStreamTrack>>,
+        self_audio: RwSignal<Option<MediaStreamTrack>>,
+    ) -> (Option<MediaStreamTrack>, Option<MediaStreamTrack>) {
+        let mut video_stream = None;
+        let mut audio_stream = None;
+        if video {
+            video_stream = self_video.get_untracked();
+        }
+        if audio {
+            audio_stream = self_audio.get_untracked();
+        }
+
+        let is_video_left = video && video_stream.is_none();
+        let is_audio_left = audio && audio_stream.is_none();
+        if is_audio_left || is_video_left {
+            let remaining = get_media_stream(is_video_left, is_audio_left).await;
+
+            match remaining {
+                Ok(stream) => {
+                    info!("Total tracks :{}", stream.get_tracks().length());
+                    let audio = stream
+                        .get_audio_tracks()
+                        .get(0)
+                        .dyn_into::<MediaStreamTrack>();
+                    if let Ok(audio) = audio {
+                        self_audio.update(|u| *u = Some(audio.clone()));
+                        audio_stream = Some(audio);
+                    }
+
+                    let video = stream
+                        .get_video_tracks()
+                        .get(0)
+                        .dyn_into::<MediaStreamTrack>();
+                    if let Ok(video) = video {
+                        self_video.update(|u| *u = Some(video.clone()));
+
+                        video_stream = Some(video);
+                    }
+                    (video_stream, audio_stream)
+                }
+                Err(err) => {
+                    warn!("Could get media {err:?}");
+                    (None, None)
+                }
+            }
+        } else {
+            (video_stream, audio_stream)
+        }
     }
 
     pub fn host_join(
@@ -837,52 +843,8 @@ impl RoomManager {
                 &rtc_config.get_value(),
                 video,
                 audio,
-                Callback::new(move |(video, audio)| {
-                    let mut video_stream = None;
-                    let mut audio_stream = None;
-                    if video {
-                        video_stream = self_video.get_untracked();
-                    }
-                    if audio {
-                        audio_stream = self_audio.get_untracked();
-                    }
-
-                    let is_video_left = video && video_stream.is_none();
-                    let is_audio_left = audio && audio_stream.is_none();
-                    async move {
-                        let remaining = get_media_stream(is_video_left, is_audio_left).await;
-
-                        match remaining {
-                            Ok(stream) => {
-                                info!("Total tracks :{}", stream.get_tracks().length());
-
-                                let audio = stream
-                                    .get_audio_tracks()
-                                    .get(0)
-                                    .dyn_into::<MediaStreamTrack>();
-                                if let Ok(audio) = audio {
-                                    self_audio.update(|v| *v = Some(audio.clone()));
-
-                                    audio_stream = Some(audio);
-                                }
-
-                                let video = stream
-                                    .get_video_tracks()
-                                    .get(0)
-                                    .dyn_into::<MediaStreamTrack>();
-                                if let Ok(video) = video {
-                                    self_video.update(|v| *v = Some(video.clone()));
-
-                                    video_stream = Some(video);
-                                }
-                                (video_stream, audio_stream)
-                            }
-                            Err(err) => {
-                                warn!("Could get media {err:?}");
-                                (None, None)
-                            }
-                        }
-                    }
+                Callback::new(move |(video, audio)| async move {
+                    Self::get_video_audio_cb(video, audio, self_video, self_audio).await
                 }),
                 Callback::new(move |(id, stream)| {
                     video_setter.set(Some((id, stream)));
