@@ -57,7 +57,7 @@ mod ssr {
     use message::{RoomJoinInfo, RtcConfig};
     use thiserror::Error;
     use tokio::sync::RwLock;
-    use tracing::{info, warn};
+    use tracing::warn;
     use unicase::UniCase;
     use util::generate_random_string;
 

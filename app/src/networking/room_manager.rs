@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, future::Future, marker::PhantomData, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, marker::PhantomData, rc::Rc};
 
 use codee::binary::BincodeSerdeCodec;
 use common::{
@@ -14,7 +14,7 @@ use leptos::{
 };
 use leptos_router::use_navigate;
 use leptos_use::{
-    core::ConnectionReadyState, use_event_listener, use_websocket_with_options,
+    core::ConnectionReadyState, use_websocket_with_options,
     UseWebSocketOptions, UseWebSocketReturn,
 };
 use thiserror::Error;
@@ -22,15 +22,11 @@ use tracing::info;
 use uuid::Uuid;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{
-    js_sys::Array, MediaStream, MediaStreamTrack, RtcIceCandidateInit, RtcPeerConnection,
-    RtcPeerConnectionIceEvent, RtcSdpType, RtcSessionDescriptionInit, RtcTrackEvent, WebSocket,
+    MediaStream, MediaStreamTrack, RtcIceCandidateInit, RtcPeerConnection, WebSocket,
 };
 
 use crate::{
     components::toaster::{Toast, Toaster},
-    networking::rtc_connect::{
-        add_media_tracks, connect_rtc, deserialize_candidate, serialize_candidate,
-    },
     Endpoint,
 };
 
