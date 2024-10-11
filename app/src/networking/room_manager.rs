@@ -188,8 +188,14 @@ impl RoomManager {
 
         let (permissions_rx, permissions_tx) = create_signal(None);
 
-        let self_video = create_rw_signal(None);
+        let self_video = create_rw_signal(Option::<MediaStreamTrack>::None);
         let self_audio = create_rw_signal(None);
+
+        create_effect(move |_| {
+            if let Some(vdo) = self_video.get() {
+                info!("added self vdo id {}", vdo.id());
+            }
+        });
 
         let rm = Self {
             state,
@@ -324,9 +330,13 @@ impl RoomManager {
                         .get(0)
                         .dyn_into::<MediaStreamTrack>();
                     if let Ok(video) = video {
-                        self_video.update(|u| *u = Some(video.clone()));
+                        info!("Created vdo track 2 id {}", video.id());
+                        self_video.update(|u| *u = Some(Clone::clone(&video)));
 
                         video_stream = Some(video);
+                    }
+                    if let Some(video) = &video_stream {
+                        info!("Sending vdo track id {}", video.id());
                     }
                     (video_stream, audio_stream)
                 }
@@ -336,6 +346,9 @@ impl RoomManager {
                 }
             }
         } else {
+            if let Some(video) = &video_stream {
+                info!("reusing vdo track id {}", video.id());
+            }
             (video_stream, audio_stream)
         }
     }
@@ -787,6 +800,7 @@ impl RoomManager {
             .get(0)
             .dyn_into::<MediaStreamTrack>();
         if let Ok(video) = video_track {
+            info!("Created vdo track 1 id {}", video.id());
             self.self_video.update(|v| *v = Some(video));
         }
         info!("Got permissions");

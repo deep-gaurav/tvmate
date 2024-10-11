@@ -359,6 +359,7 @@ pub fn VideoChatManager(
                                                             }else if video_connected.get_untracked() {
                                                                 rm.self_video.update(|vdo|{
                                                                     if let Some(vdo) = vdo{
+                                                                        info!("Disable {}", vdo.id());
                                                                         vdo.set_enabled(false);
                                                                     }else{
                                                                         toaster.toast(Toast { message: "Failed to turn off video".into(), r#type: crate::components::toaster::ToastType::Failed });
@@ -367,6 +368,7 @@ pub fn VideoChatManager(
                                                             }else{
                                                                 rm.self_video.update(|vdo|{
                                                                     if let Some(vdo) = vdo{
+                                                                        info!("Enable {}", vdo.id());
                                                                         vdo.set_enabled(true);
                                                                     }else{
                                                                         toaster.toast(Toast { message: "Failed to turn on video".into(), r#type: crate::components::toaster::ToastType::Failed });
