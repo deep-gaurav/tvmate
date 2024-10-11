@@ -105,6 +105,7 @@ pub async fn connect_to_user<F>(
     ice_signal: Signal<Option<(Uuid, String)>>,
     session_signal: Signal<Option<(Uuid, RTCSessionDesc)>>,
 
+    close_self: Callback<()>,
     owner: Owner,
 ) -> Result<(), JsValue>
 where
@@ -148,6 +149,8 @@ where
                             audio_media_setter.call((user, None));
                             video_media_setter.call((self_id, None));
                             audio_media_setter.call((self_id, None));
+                            close_self.call(());
+
                             pc.close();
                         }
                         RtcPeerConnectionState::Connected => {
@@ -280,6 +283,8 @@ pub fn receive_peer_connections<F>(
     ice_signal: Signal<Option<(Uuid, String)>>,
     session_signal: Signal<Option<(Uuid, RTCSessionDesc)>>,
 
+    close_self: Callback<()>,
+
     owner: Owner,
 ) where
     F: Future<Output = (Option<MediaStreamTrack>, Option<MediaStreamTrack>)> + 'static,
@@ -356,7 +361,9 @@ pub fn receive_peer_connections<F>(
                                         audio_media_setter.call((from_user, None));
                                         video_media_setter.call((self_id, None));
                                         audio_media_setter.call((self_id, None));
+
                                         pc.close();
+                                        close_self.call(());
                                     }
                                     RtcPeerConnectionState::Connected => {
                                         rtc_setter.call((from_user, Some(pc.clone())));

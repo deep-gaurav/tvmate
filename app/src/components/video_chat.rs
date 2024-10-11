@@ -430,8 +430,8 @@ pub fn VideoChatManager(
                                                                 <button class="flex flex-row hover:bg-white/20 px-4 py-1 gap-2 items-center text-red-500"
                                                                     on:click=move|_|{
                                                                         let rm = expect_context::<RoomManager>();
-                                                                        pc.close();
                                                                         let _= rm.close_vc(user.meta.get().id);
+                                                                        pc.close();
                                                                     }
                                                                 >
                                                                     "[ "

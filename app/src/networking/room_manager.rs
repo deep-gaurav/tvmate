@@ -277,6 +277,20 @@ impl RoomManager {
                     },
                     ice_read.into(),
                     session_description.into(),
+                    Callback::new(move |_| {
+                        self_video.update(|v| {
+                            if let Some(v) = v {
+                                v.stop();
+                            }
+                            *v = None
+                        });
+                        self_audio.update(|v| {
+                            if let Some(v) = v {
+                                v.stop();
+                            }
+                            *v = None
+                        });
+                    }),
                     owner,
                 );
             }
@@ -321,7 +335,7 @@ impl RoomManager {
                         .get(0)
                         .dyn_into::<MediaStreamTrack>();
                     if let Ok(audio) = audio {
-                        self_audio.update(|u| *u = Some(audio.clone()));
+                        self_audio.update(|u| *u = Some(Clone::clone(&audio)));
                         audio_stream = Some(audio);
                     }
 
@@ -890,6 +904,20 @@ impl RoomManager {
                 },
                 ice_signal.into(),
                 session_signal.into(),
+                Callback::new(move |_| {
+                    self_video.update(|v| {
+                        if let Some(v) = v {
+                            v.stop();
+                        }
+                        *v = None
+                    });
+                    self_audio.update(|v| {
+                        if let Some(v) = v {
+                            v.stop();
+                        }
+                        *v = None
+                    });
+                }),
                 owner,
             )
             .await?;
@@ -904,18 +932,6 @@ impl RoomManager {
             return Err(JsValue::from_str("Room not connected"));
         };
 
-        self.audio_chat_stream_signal.1.set(Some((user, None)));
-        self.video_chat_stream_signal.1.set(Some((user, None)));
-
-        self.audio_chat_stream_signal
-            .1
-            .set(Some((room_info.user_id, None)));
-        self.video_chat_stream_signal
-            .1
-            .set(Some((room_info.user_id, None)));
-
-        self.rtc_signal.1.set(Some((user, None)));
-
         self.self_audio.update(|val| {
             if let Some(val) = val {
                 val.stop();
@@ -929,6 +945,18 @@ impl RoomManager {
             }
             *val = None;
         });
+
+        self.audio_chat_stream_signal.1.set(Some((user, None)));
+        self.video_chat_stream_signal.1.set(Some((user, None)));
+
+        self.audio_chat_stream_signal
+            .1
+            .set(Some((room_info.user_id, None)));
+        self.video_chat_stream_signal
+            .1
+            .set(Some((room_info.user_id, None)));
+
+        self.rtc_signal.1.set(Some((user, None)));
 
         Ok(())
     }
