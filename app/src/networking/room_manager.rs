@@ -8,9 +8,9 @@ use common::{
     PlayerStatus, UserMeta, UserState,
 };
 use leptos::{
-    create_effect, create_signal, expect_context, logging::warn, store_value, with_owner, Callback,
-    Owner, ReadSignal, Signal, SignalGet, SignalGetUntracked, SignalSet, SignalWith,
-    SignalWithUntracked, StoredValue, WriteSignal,
+    create_effect, create_rw_signal, create_signal, expect_context, logging::warn, store_value,
+    with_owner, Callback, Owner, ReadSignal, RwSignal, Signal, SignalGet, SignalGetUntracked,
+    SignalSet, SignalUpdate, SignalWith, SignalWithUntracked, StoredValue, WriteSignal,
 };
 use leptos_router::use_navigate;
 use leptos_use::{
@@ -66,8 +66,8 @@ pub struct RoomManager {
     ),
     pub vc_permission: StoredValue<HashMap<Uuid, (bool, bool)>>,
 
-    pub self_video: StoredValue<Option<MediaStreamTrack>>,
-    pub self_audio: StoredValue<Option<MediaStreamTrack>>,
+    pub self_video: RwSignal<Option<MediaStreamTrack>>,
+    pub self_audio: RwSignal<Option<MediaStreamTrack>>,
 
     pub permission_request_signal: Signal<Option<(Uuid, bool, bool)>>,
     permission_request_sender: WriteSignal<Option<(Uuid, bool, bool)>>,
@@ -188,8 +188,8 @@ impl RoomManager {
 
         let (permissions_rx, permissions_tx) = create_signal(None);
 
-        let self_video = store_value(None);
-        let self_audio = store_value(None);
+        let self_video = create_rw_signal(None);
+        let self_audio = create_rw_signal(None);
 
         let rm = Self {
             state,
@@ -241,10 +241,10 @@ impl RoomManager {
                         let mut video_stream = None;
                         let mut audio_stream = None;
                         if video {
-                            video_stream = self_video.get_value();
+                            video_stream = self_video.get_untracked();
                         }
                         if audio {
-                            audio_stream = self_audio.get_value();
+                            audio_stream = self_audio.get_untracked();
                         }
 
                         let is_video_left = video && video_stream.is_none();
@@ -262,6 +262,7 @@ impl RoomManager {
                                             .get(0)
                                             .dyn_into::<MediaStreamTrack>();
                                         if let Ok(audio) = audio {
+                                            self_audio.update(|u| *u = Some(audio.clone()));
                                             audio_stream = Some(audio);
                                         }
 
@@ -270,6 +271,8 @@ impl RoomManager {
                                             .get(0)
                                             .dyn_into::<MediaStreamTrack>();
                                         if let Ok(video) = video {
+                                            self_video.update(|u| *u = Some(video.clone()));
+
                                             video_stream = Some(video);
                                         }
                                         (video_stream, audio_stream)
@@ -770,7 +773,7 @@ impl RoomManager {
             .get(0)
             .dyn_into::<MediaStreamTrack>();
         if let Ok(audio) = audio_track {
-            self.self_audio.update_value(|v| *v = Some(audio));
+            self.self_audio.update(|v| *v = Some(audio));
         }
 
         let video_track = stream
@@ -778,7 +781,7 @@ impl RoomManager {
             .get(0)
             .dyn_into::<MediaStreamTrack>();
         if let Ok(video) = video_track {
-            self.self_video.update_value(|v| *v = Some(video));
+            self.self_video.update(|v| *v = Some(video));
         }
         info!("Got permissions");
         self.send_message(
@@ -838,10 +841,10 @@ impl RoomManager {
                     let mut video_stream = None;
                     let mut audio_stream = None;
                     if video {
-                        video_stream = self_video.get_value();
+                        video_stream = self_video.get_untracked();
                     }
                     if audio {
-                        audio_stream = self_audio.get_value();
+                        audio_stream = self_audio.get_untracked();
                     }
 
                     let is_video_left = video && video_stream.is_none();
@@ -858,6 +861,8 @@ impl RoomManager {
                                     .get(0)
                                     .dyn_into::<MediaStreamTrack>();
                                 if let Ok(audio) = audio {
+                                    self_audio.update(|v| *v = Some(audio.clone()));
+
                                     audio_stream = Some(audio);
                                 }
 
@@ -866,6 +871,8 @@ impl RoomManager {
                                     .get(0)
                                     .dyn_into::<MediaStreamTrack>();
                                 if let Ok(video) = video {
+                                    self_video.update(|v| *v = Some(video.clone()));
+
                                     video_stream = Some(video);
                                 }
                                 (video_stream, audio_stream)
@@ -933,14 +940,14 @@ impl RoomManager {
 
         self.rtc_signal.1.set(Some((user, None)));
 
-        self.self_audio.update_value(|val| {
+        self.self_audio.update(|val| {
             if let Some(val) = val {
                 val.stop();
             }
             *val = None;
         });
 
-        self.self_video.update_value(|val| {
+        self.self_video.update(|val| {
             if let Some(val) = val {
                 val.stop();
             }

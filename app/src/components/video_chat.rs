@@ -311,7 +311,23 @@ pub fn VideoChatManager(
                             let:user_id
                         >
                             {
+                                let rm = expect_context::<RoomManager>();
                                 let user = create_memo(move |_| video_users.get().get(&user_id).cloned());
+                                let video_connected = create_rw_signal(false);
+                                let audio_connected = create_rw_signal(false);
+
+                                create_effect({
+                                    let rm = rm.clone();
+                                    move|_|{
+                                        if let Some(video) = rm.self_video.get(){
+                                            video_connected.set(video.enabled());
+                                        }
+                                        if let Some(audio) = rm.self_audio.get(){
+                                            audio_connected.set(audio.enabled());
+                                        }
+                                    }
+                                });
+
                                 if let Some(user) = user.get() {
                                     if user.is_self {
                                         view! {
@@ -324,37 +340,81 @@ pub fn VideoChatManager(
                                                 <div class="flex-grow min-w-6" />
                                                 <div class="flex gap-3">
                                                     <button class="flex flex-row hover:bg-white/20 px-4 py-1 gap-2 items-center"
+                                                        class=("text-green-500", move|| user.connection.get_untracked().is_some() && video_connected.get())
+                                                        class=("text-red-500", move || user.connection.get_untracked().is_some() && !video_connected.get())
                                                         on:click=move|_|{
+
                                                             let rm = expect_context::<RoomManager>();
                                                             let toaster = expect_context::<Toaster>();
-                                                            leptos::spawn_local(async move {
-                                                                if let Err(err) =  rm.send_vc_request(user.meta.get_untracked().id, true, true).await{
-                                                                    warn!("Failed to send vc request {err:?}");
-                                                                    toaster.toast(Toast { message: "Failed to video call".into(), r#type: crate::components::toaster::ToastType::Failed });
-                                                                }else{
-                                                                    toaster.toast(Toast { message: "Sent video call request".into(), r#type: crate::components::toaster::ToastType::Success });
-                                                                    close.call(());
-                                                                }
-                                                            });
+                                                            if user.connection.get_untracked().is_none(){
+                                                                leptos::spawn_local(async move {
+                                                                    if let Err(err) =  rm.send_vc_request(user.meta.get_untracked().id, true, true).await{
+                                                                        warn!("Failed to send vc request {err:?}");
+                                                                        toaster.toast(Toast { message: "Failed to video call".into(), r#type: crate::components::toaster::ToastType::Failed });
+                                                                    }else{
+                                                                        toaster.toast(Toast { message: "Sent video call request".into(), r#type: crate::components::toaster::ToastType::Success });
+                                                                        close.call(());
+                                                                    }
+                                                                });
+                                                            }else if video_connected.get_untracked() {
+                                                                rm.self_video.update(|vdo|{
+                                                                    if let Some(vdo) = vdo{
+                                                                        vdo.set_enabled(false);
+                                                                    }else{
+                                                                        toaster.toast(Toast { message: "Failed to turn off video".into(), r#type: crate::components::toaster::ToastType::Failed });
+                                                                    }
+                                                                });
+                                                            }else{
+                                                                rm.self_video.update(|vdo|{
+                                                                    if let Some(vdo) = vdo{
+                                                                        vdo.set_enabled(true);
+                                                                    }else{
+                                                                        toaster.toast(Toast { message: "Failed to turn on video".into(), r#type: crate::components::toaster::ToastType::Failed });
+                                                                    }
+                                                                });
+                                                            }
                                                         }
                                                     >
                                                         "[ "
-                                                        <Icon class="w-8" icon=crate::components::icons::Icons::Video />
+                                                        <Icon
+                                                            class="w-8"
+                                                            icon=crate::components::icons::Icons::Video
+                                                        />
                                                         " Video ]"
                                                     </button>
                                                     <button class="flex flex-row hover:bg-white/20 px-4 py-1 gap-2 items-center"
+                                                        class=("text-green-500", move|| user.connection.get_untracked().is_some() && audio_connected.get())
+                                                        class=("text-red-500", move || user.connection.get_untracked().is_some() && !audio_connected.get())
                                                         on:click=move|_|{
                                                             let rm = expect_context::<RoomManager>();
                                                             let toaster = expect_context::<Toaster>();
-                                                            leptos::spawn_local(async move {
-                                                                if let Err(err) =  rm.send_vc_request(user.meta.get_untracked().id, false, true).await{
-                                                                    warn!("Failed to send vc request {err:?}");
-                                                                    toaster.toast(Toast { message: "Failed to audio call".into(), r#type: crate::components::toaster::ToastType::Failed });
-                                                                }else{
-                                                                    toaster.toast(Toast { message: "Sent auio call request".into(), r#type: crate::components::toaster::ToastType::Success });
-                                                                    close.call(());
-                                                                }
-                                                            });
+                                                            if user.connection.get_untracked().is_none(){
+                                                                leptos::spawn_local(async move {
+                                                                    if let Err(err) =  rm.send_vc_request(user.meta.get_untracked().id, false, true).await{
+                                                                        warn!("Failed to send vc request {err:?}");
+                                                                        toaster.toast(Toast { message: "Failed to audio call".into(), r#type: crate::components::toaster::ToastType::Failed });
+                                                                    }else{
+                                                                        toaster.toast(Toast { message: "Sent auio call request".into(), r#type: crate::components::toaster::ToastType::Success });
+                                                                        close.call(());
+                                                                    }
+                                                                });
+                                                            }else if audio_connected.get_untracked() {
+                                                                rm.self_audio.update(|vdo|{
+                                                                    if let Some(vdo) = vdo{
+                                                                        vdo.set_enabled(false);
+                                                                    }else{
+                                                                        toaster.toast(Toast { message: "Failed to turn off mic".into(), r#type: crate::components::toaster::ToastType::Failed });
+                                                                    }
+                                                                });
+                                                            }else{
+                                                                rm.self_audio.update(|vdo|{
+                                                                    if let Some(vdo) = vdo{
+                                                                        vdo.set_enabled(true);
+                                                                    }else{
+                                                                        toaster.toast(Toast { message: "Failed to turn on mic".into(), r#type: crate::components::toaster::ToastType::Failed });
+                                                                    }
+                                                                });
+                                                            }
                                                         }
                                                     >
                                                         "[ "
@@ -365,7 +425,7 @@ pub fn VideoChatManager(
                                                     {
                                                         move || if let Some(pc) = user.connection.get(){
                                                             view! {
-                                                                <button class="flex flex-row hover:bg-white/20 px-4 py-1 gap-2 items-center"
+                                                                <button class="flex flex-row hover:bg-white/20 px-4 py-1 gap-2 items-center text-red-500"
                                                                     on:click=move|_|{
                                                                         let rm = expect_context::<RoomManager>();
                                                                         pc.close();
