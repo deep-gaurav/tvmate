@@ -122,6 +122,12 @@ pub fn AudioChat() -> impl IntoView {
                     }
                 }
             } else {
+                info!("Remove audio");
+                if let Some(audio_ref) = audio_tag_ref.with(|map| map.get(&user_id).cloned()) {
+                    if let Some(audio) = audio_ref.get_untracked() {
+                        audio.set_src_object(None);
+                    }
+                }
                 acs.update_value(|acs| {
                     if let Some(ac) = acs.remove(&user_id) {
                         progress_div_ref.update(|prog_map| {
@@ -215,24 +221,37 @@ pub fn AudioChat() -> impl IntoView {
                                         }
                                         <div class="text-xs"> {user.name} </div>
                                         {
-                                            move ||{
-                                                let rm = expect_context::<RoomManager>();
 
-                                                let audio_ref= audio_tag_ref.with(|m|m.get(&user.id).cloned());
-                                                let self_user_if = rm.get_room_info().with(|r|r.as_ref().map(|u|u.user_id));
+                                            let rm = expect_context::<RoomManager>();
 
-                                                if Some(user.id) != self_user_if   {
-                                                    if let Some(audio_ref) = audio_ref {
-                                                        view! {
-                                                            <audio ref=audio_ref class="hidden" />
-                                                        }.into_view()
-                                                    }else{
-                                                        view! {}.into_view()
+                                            let (audio_ref, set_audio_ref)= create_signal(None);
+                                            create_effect(move|_|{
+                                                if audio_ref.get().is_none(){
+                                                    if let Some(tag_ref) =  audio_tag_ref.with(|m|m.get(&user.id).cloned()){
+                                                        set_audio_ref.set(Some(tag_ref))
                                                     }
-                                                }else{
-                                                    view! {}.into_view()
+                                                }
+                                            });
+                                            let self_user_if = rm.get_room_info().with(|r|r.as_ref().map(|u|u.user_id));
+
+                                            view! {
+                                                {
+                                                    move || {
+                                                        if Some(user.id) != self_user_if   {
+                                                            if let Some(audio_ref) = audio_ref.get() {
+                                                                view! {
+                                                                    <audio ref=audio_ref class="hidden" />
+                                                                }.into_view()
+                                                            }else{
+                                                                view! {}.into_view()
+                                                            }
+                                                        }else{
+                                                            view! {}.into_view()
+                                                        }
+                                                    }
                                                 }
                                             }
+
                                         }
                                     </div>
                                 </For>

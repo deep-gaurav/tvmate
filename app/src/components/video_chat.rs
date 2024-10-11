@@ -74,10 +74,12 @@ pub fn VideoChat() -> impl IntoView {
             }) = video_users.with(|map| map.get(&user_id).cloned())
             {
                 if let Some(video) = video_ref.get_untracked() {
-                    info!("Playing video");
+                    info!("Playing video {}", stream.is_some());
                     video.set_src_object(stream.as_ref());
-                    if let Err(err) = video.play() {
-                        warn!("Cannot play audio {err:?}")
+                    if stream.is_some() {
+                        if let Err(err) = video.play() {
+                            warn!("Cannot play audio {err:?}")
+                        }
                     }
                     is_video_active.set(stream.is_some());
                 } else {

@@ -66,6 +66,9 @@ pub struct RoomManager {
     ),
     pub vc_permission: StoredValue<HashMap<Uuid, (bool, bool)>>,
 
+    pub self_video: StoredValue<Option<MediaStreamTrack>>,
+    pub self_audio: StoredValue<Option<MediaStreamTrack>>,
+
     pub permission_request_signal: Signal<Option<(Uuid, bool, bool)>>,
     permission_request_sender: WriteSignal<Option<(Uuid, bool, bool)>>,
     owner: Owner,
@@ -185,6 +188,9 @@ impl RoomManager {
 
         let (permissions_rx, permissions_tx) = create_signal(None);
 
+        let self_video = store_value(None);
+        let self_audio = store_value(None);
+
         let rm = Self {
             state,
             room_info_signal,
@@ -198,6 +204,8 @@ impl RoomManager {
             permission_request_sender: permissions_tx,
             permission_request_signal: permissions_rx.into(),
             rtc_signal: (rtc_rx, rtc_tx),
+            self_audio,
+            self_video,
         };
         with_owner(owner, {
             let rm = rm.clone();
@@ -207,7 +215,7 @@ impl RoomManager {
                     Callback::new(move |_| {
                         room_info_signal
                             .0
-                            .with(|room| room.as_ref().map(|r: &RoomInfo| r.user_id))
+                            .with_untracked(|room| room.as_ref().map(|r: &RoomInfo| r.user_id))
                     }),
                     {
                         let state = state.clone();
@@ -228,6 +236,53 @@ impl RoomManager {
                         vc_permission
                             .with_value(|p| p.get(&user_id).cloned())
                             .unwrap_or((false, false))
+                    }),
+                    Callback::new(move |(video, audio)| {
+                        let mut video_stream = None;
+                        let mut audio_stream = None;
+                        if video {
+                            video_stream = self_video.get_value();
+                        }
+                        if audio {
+                            audio_stream = self_audio.get_value();
+                        }
+
+                        let is_video_left = video && video_stream.is_none();
+                        let is_audio_left = audio && audio_stream.is_none();
+                        async move {
+                            if is_audio_left || is_video_left {
+                                let remaining =
+                                    get_media_stream(is_video_left, is_audio_left).await;
+
+                                match remaining {
+                                    Ok(stream) => {
+                                        info!("Total tracks :{}", stream.get_tracks().length());
+                                        let audio = stream
+                                            .get_audio_tracks()
+                                            .get(0)
+                                            .dyn_into::<MediaStreamTrack>();
+                                        if let Ok(audio) = audio {
+                                            audio_stream = Some(audio);
+                                        }
+
+                                        let video = stream
+                                            .get_video_tracks()
+                                            .get(0)
+                                            .dyn_into::<MediaStreamTrack>();
+                                        if let Ok(video) = video {
+                                            video_stream = Some(video);
+                                        }
+                                        (video_stream, audio_stream)
+                                    }
+                                    Err(err) => {
+                                        warn!("Could get media {err:?}");
+                                        (None, None)
+                                    }
+                                }
+                            } else {
+                                (video_stream, audio_stream)
+                            }
+                        }
                     }),
                     Callback::new(move |(user, stream)| {
                         video_tx.set(Some((user, stream)));
@@ -709,7 +764,22 @@ impl RoomManager {
         video: bool,
         audio: bool,
     ) -> Result<(), JsValue> {
-        let _ = get_media_stream(video, audio).await?;
+        let stream = get_media_stream(video, audio).await?;
+        let audio_track = stream
+            .get_audio_tracks()
+            .get(0)
+            .dyn_into::<MediaStreamTrack>();
+        if let Ok(audio) = audio_track {
+            self.self_audio.update_value(|v| *v = Some(audio));
+        }
+
+        let video_track = stream
+            .get_video_tracks()
+            .get(0)
+            .dyn_into::<MediaStreamTrack>();
+        if let Ok(video) = video_track {
+            self.self_video.update_value(|v| *v = Some(video));
+        }
         info!("Got permissions");
         self.send_message(
             ClientMessage::RequestCall(user, video, audio),
@@ -754,6 +824,8 @@ impl RoomManager {
             let video_setter = self.video_chat_stream_signal.1;
             let audio_setter = self.audio_chat_stream_signal.1;
             let rtc_setter = self.rtc_signal.1;
+            let self_video = self.self_video;
+            let self_audio = self.self_audio;
             info!("Connect to user {user} self_id {}", room_info.user_id);
             let rm = self.clone();
             connect_to_user(
@@ -762,6 +834,49 @@ impl RoomManager {
                 &rtc_config.get_value(),
                 video,
                 audio,
+                Callback::new(move |(video, audio)| {
+                    let mut video_stream = None;
+                    let mut audio_stream = None;
+                    if video {
+                        video_stream = self_video.get_value();
+                    }
+                    if audio {
+                        audio_stream = self_audio.get_value();
+                    }
+
+                    let is_video_left = video && video_stream.is_none();
+                    let is_audio_left = audio && audio_stream.is_none();
+                    async move {
+                        let remaining = get_media_stream(is_video_left, is_audio_left).await;
+
+                        match remaining {
+                            Ok(stream) => {
+                                info!("Total tracks :{}", stream.get_tracks().length());
+
+                                let audio = stream
+                                    .get_audio_tracks()
+                                    .get(0)
+                                    .dyn_into::<MediaStreamTrack>();
+                                if let Ok(audio) = audio {
+                                    audio_stream = Some(audio);
+                                }
+
+                                let video = stream
+                                    .get_video_tracks()
+                                    .get(0)
+                                    .dyn_into::<MediaStreamTrack>();
+                                if let Ok(video) = video {
+                                    video_stream = Some(video);
+                                }
+                                (video_stream, audio_stream)
+                            }
+                            Err(err) => {
+                                warn!("Could get media {err:?}");
+                                (None, None)
+                            }
+                        }
+                    }
+                }),
                 Callback::new(move |(id, stream)| {
                     video_setter.set(Some((id, stream)));
                 }),
@@ -817,6 +932,20 @@ impl RoomManager {
             .set(Some((room_info.user_id, None)));
 
         self.rtc_signal.1.set(Some((user, None)));
+
+        self.self_audio.update_value(|val| {
+            if let Some(val) = val {
+                val.stop();
+            }
+            *val = None;
+        });
+
+        self.self_video.update_value(|val| {
+            if let Some(val) = val {
+                val.stop();
+            }
+            *val = None;
+        });
 
         Ok(())
     }

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, future::Future};
 
 use common::message::{RTCSessionDesc, RtcConfig};
 use leptos::{
@@ -69,19 +69,19 @@ pub async fn get_media_stream(video: bool, audio: bool) -> Result<MediaStream, J
 
 pub async fn add_media_tracks(
     pc: &RtcPeerConnection,
-    video: bool,
-    audio: bool,
-) -> Result<MediaStream, JsValue> {
-    let media_stream = get_media_stream(video, audio).await?;
+    video: Option<MediaStreamTrack>,
+    audio: Option<MediaStreamTrack>,
+) -> Result<(), JsValue> {
+    let ms = MediaStream::new()?;
 
-    for track in media_stream.get_audio_tracks() {
+    if let Some(track) = audio {
         info!("Add Audio track");
-        pc.add_track(&track.dyn_into()?, &media_stream, &Array::new());
+        pc.add_track(&track, &ms, &Array::new());
     }
 
-    for track in media_stream.get_video_tracks() {
+    if let Some(track) = video {
         info!("Add Video track");
-        pc.add_track(&track.dyn_into()?, &media_stream, &Array::new());
+        pc.add_track(&track, &ms, &Array::new());
     }
 
     let offer = wasm_bindgen_futures::JsFuture::from(pc.create_offer()).await?;
@@ -89,15 +89,17 @@ pub async fn add_media_tracks(
 
     wasm_bindgen_futures::JsFuture::from(pc.set_local_description(&offer)).await?;
 
-    Ok(media_stream)
+    Ok(())
 }
 
-pub async fn connect_to_user(
+pub async fn connect_to_user<F>(
     self_id: Uuid,
     user: Uuid,
     rtc_config: &RtcConfig,
     video: bool,
     audio: bool,
+    self_video_cb: Callback<(bool, bool), F>,
+
     video_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
     audio_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
     rtc_setter: Callback<(Uuid, Option<RtcPeerConnection>), ()>,
@@ -109,7 +111,10 @@ pub async fn connect_to_user(
     session_signal: Signal<Option<(Uuid, RTCSessionDesc)>>,
 
     owner: Owner,
-) -> Result<(), JsValue> {
+) -> Result<(), JsValue>
+where
+    F: Future<Output = (Option<MediaStreamTrack>, Option<MediaStreamTrack>)> + 'static,
+{
     info!("Host user");
     let pc = connect_rtc(rtc_config)?;
 
@@ -178,13 +183,9 @@ pub async fn connect_to_user(
         );
     });
 
-    let local_stream = add_media_tracks(&pc, video, audio).await?;
+    let (video_track, audio_track) = self_video_cb.call((video, audio)).await;
 
-    if let Ok(audio) = local_stream
-        .get_audio_tracks()
-        .get(0)
-        .dyn_into::<MediaStreamTrack>()
-    {
+    if let Some(audio) = audio_track.clone() {
         if let Ok(audio_stream) = MediaStream::new_with_tracks(&Array::of1(&audio)) {
             info!("Host: set audio");
             audio_media_setter.call((self_id, Some(audio_stream)));
@@ -192,11 +193,7 @@ pub async fn connect_to_user(
             warn!("Host: Cant make audio");
         }
     }
-    if let Ok(video) = local_stream
-        .get_video_tracks()
-        .get(0)
-        .dyn_into::<MediaStreamTrack>()
-    {
+    if let Some(video) = video_track.clone() {
         if let Ok(video_stream) = MediaStream::new_with_tracks(&Array::of1(&video)) {
             info!("Host: set video");
             video_media_setter.call((self_id, Some(video_stream)));
@@ -204,6 +201,8 @@ pub async fn connect_to_user(
             warn!("Host: Cant make video");
         }
     }
+
+    add_media_tracks(&pc, video_track, audio_track).await?;
 
     let offer = wasm_bindgen_futures::JsFuture::from(pc.create_offer()).await?;
     let offer = offer.unchecked_into::<RtcSessionDescriptionInit>();
@@ -261,11 +260,12 @@ pub async fn connect_to_user(
     Ok(())
 }
 
-pub fn receive_peer_connections(
+pub fn receive_peer_connections<F>(
     self_id: Callback<(), Option<Uuid>>,
     rtc_config: Callback<(), Option<RtcConfig>>,
 
     permissions_callback: Callback<Uuid, (bool, bool)>,
+    self_video_cb: Callback<(bool, bool), F>,
 
     video_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
     audio_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
@@ -278,7 +278,9 @@ pub fn receive_peer_connections(
     session_signal: Signal<Option<(Uuid, RTCSessionDesc)>>,
 
     owner: Owner,
-) {
+) where
+    F: Future<Output = (Option<MediaStreamTrack>, Option<MediaStreamTrack>)> + 'static,
+{
     let peers = store_value(HashMap::<Uuid, RtcPeerConnection>::new());
     let pending_candidates = store_value(HashMap::<Uuid, Vec<RtcIceCandidateInit>>::new());
 
@@ -301,6 +303,7 @@ pub fn receive_peer_connections(
 
     create_effect(move |_| {
         if let Some((from_user, rtcsession_desc)) = session_signal.get() {
+            info!("Got sdp from {from_user} starting connection");
             let Ok(offer_type) =
                 RtcSdpType::from_js_value(&JsValue::from_str(&rtcsession_desc.typ))
                     .ok_or(JsValue::from_str("cannot convert sdp type"))
@@ -315,6 +318,7 @@ pub fn receive_peer_connections(
             let Some(self_id) = self_id.call(()) else {
                 return;
             };
+            info!("Self id {self_id}");
             let Some(rtc_config) = rtc_config.call(()) else {
                 return;
             };
@@ -385,6 +389,7 @@ pub fn receive_peer_connections(
                     rtcsession_desc,
                     video,
                     audio,
+                    self_video_cb,
                     video_media_setter,
                     audio_media_setter,
                 )
@@ -439,7 +444,7 @@ pub fn receive_peer_connections(
     });
 }
 
-async fn accept_peer_connection(
+async fn accept_peer_connection<F>(
     self_id: Uuid,
 
     pc: &RtcPeerConnection,
@@ -447,29 +452,43 @@ async fn accept_peer_connection(
 
     video: bool,
     audio: bool,
+    self_video_cb: Callback<(bool, bool), F>,
+
     video_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
     audio_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
-) -> Result<RTCSessionDesc, JsValue> {
-    let local_stream = add_media_tracks(&pc, video, audio).await?;
+) -> Result<RTCSessionDesc, JsValue>
+where
+    F: Future<Output = (Option<MediaStreamTrack>, Option<MediaStreamTrack>)> + 'static,
+{
+    info!("Get local audio {audio} video {video}");
+    let (video_track, audio_track) = self_video_cb.call((video, audio)).await;
 
-    if let Ok(audio) = local_stream
-        .get_audio_tracks()
-        .get(0)
-        .dyn_into::<MediaStreamTrack>()
-    {
+    info!(
+        "Received local audio :{} video: {}",
+        audio_track.is_some(),
+        video_track.is_some()
+    );
+
+    if video && video_track.is_none() {
+        return Err(JsValue::from_str("Cannot get video"));
+    }
+
+    if audio && audio_track.is_none() {
+        return Err(JsValue::from_str("Cannot get video"));
+    }
+
+    if let Some(audio) = audio_track.clone() {
         if let Ok(audio_stream) = MediaStream::new_with_tracks(&Array::of1(&audio)) {
             audio_media_setter.call((self_id, Some(audio_stream)));
         }
     }
-    if let Ok(video) = local_stream
-        .get_video_tracks()
-        .get(0)
-        .dyn_into::<MediaStreamTrack>()
-    {
+    if let Some(video) = video_track.clone() {
         if let Ok(video_stream) = MediaStream::new_with_tracks(&Array::of1(&video)) {
             video_media_setter.call((self_id, Some(video_stream)));
         }
     }
+
+    add_media_tracks(pc, video_track, audio_track).await?;
 
     let offer_type = RtcSdpType::from_js_value(&JsValue::from_str(&rtc_session_desc.typ))
         .ok_or(JsValue::from_str("cannot convert sdp type"))?;
