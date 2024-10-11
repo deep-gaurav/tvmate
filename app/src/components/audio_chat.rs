@@ -34,84 +34,103 @@ pub fn AudioChat() -> impl IntoView {
         }
     });
 
+    let acs = store_value(HashMap::new());
+
     let owner = Owner::current().unwrap();
 
     create_effect(move |_| {
         if let Some((user_id, stream)) = audio_receiver.get() {
-            if let Some(audio_ref) = audio_tag_ref.with(|map| map.get(&user_id).cloned()) {
-                if let Some(audio) = audio_ref.get_untracked() {
-                    audio.set_src_object(Some(&stream));
-                    info!("Playing audio");
-                    if let Err(err) = audio.play() {
-                        warn!("Cannot play audio {err:?}")
-                    }
-                } else {
-                    info!("No audio in ref");
-                }
-
-                let ac = AudioContext::new();
-                match ac {
-                    Ok(ac) => {
-                        let Ok(analyzer) = ac.create_analyser() else {
-                            warn!("Cant create analyzer");
-                            return;
-                        };
-                        let Ok(source) = ac.create_media_stream_source(&stream) else {
-                            warn!("Cant create source node");
-                            return;
-                        };
-                        if let Err(err) = source.connect_with_audio_node(&analyzer) {
-                            warn!("cant connect {err:?}");
+            if let Some(stream) = stream {
+                if let Some(audio_ref) = audio_tag_ref.with(|map| map.get(&user_id).cloned()) {
+                    if let Some(audio) = audio_ref.get_untracked() {
+                        audio.set_src_object(Some(&stream));
+                        info!("Playing audio");
+                        if let Err(err) = audio.play() {
+                            warn!("Cannot play audio {err:?}")
                         }
+                    } else {
+                        info!("No audio in ref");
+                    }
 
-                        analyzer.set_fft_size(2048);
-                        let buffer_length = analyzer.fft_size();
-                        let buffer =
-                            with_owner(owner, || store_value(vec![0_u8; buffer_length as usize]));
+                    let ac = AudioContext::new();
+                    match ac {
+                        Ok(ac) => {
+                            let Ok(analyzer) = ac.create_analyser() else {
+                                warn!("Cant create analyzer");
+                                return;
+                            };
+                            let Ok(source) = ac.create_media_stream_source(&stream) else {
+                                warn!("Cant create source node");
+                                return;
+                            };
+                            if let Err(err) = source.connect_with_audio_node(&analyzer) {
+                                warn!("cant connect {err:?}");
+                            }
 
-                        with_owner(owner, || {
-                            use_raf_fn(move |_| {
-                                buffer.update_value(|buffer| {
-                                    analyzer.get_byte_time_domain_data(buffer);
-                                    let sum_of_squares: f64 = buffer
-                                        .iter()
-                                        .map(|&val| {
-                                            let normalized = (f64::from(val) - 128.0) / 128.0;
-                                            normalized * normalized
-                                        })
-                                        .sum();
+                            analyzer.set_fft_size(2048);
+                            let buffer_length = analyzer.fft_size();
+                            let buffer = with_owner(owner, || {
+                                store_value(vec![0_u8; buffer_length as usize])
+                            });
 
-                                    let rms = ((sum_of_squares / f64::from(buffer_length)) + 1e-10)
-                                        .sqrt();
+                            with_owner(owner, || {
+                                use_raf_fn(move |_| {
+                                    buffer.update_value(|buffer| {
+                                        analyzer.get_byte_time_domain_data(buffer);
+                                        let sum_of_squares: f64 = buffer
+                                            .iter()
+                                            .map(|&val| {
+                                                let normalized = (f64::from(val) - 128.0) / 128.0;
+                                                normalized * normalized
+                                            })
+                                            .sum();
 
-                                    // Map dB to percentage, assuming typical values for speech
-                                    // Adjust these values based on your specific use case
-                                    const MIN_DB: f64 = -70.0; // Adjust this if needed
-                                    const MAX_DB: f64 = 0.0; // 0 dB represents maximum volume
+                                        let rms = ((sum_of_squares / f64::from(buffer_length))
+                                            + 1e-10)
+                                            .sqrt();
 
-                                    // Convert RMS to decibels, then to percentage
-                                    // Convert RMS to decibels, then to percentage
-                                    let db = if rms > 0.0 {
-                                        20.0 * rms.log10()
-                                    } else {
-                                        MIN_DB
-                                    };
+                                        // Map dB to percentage, assuming typical values for speech
+                                        // Adjust these values based on your specific use case
+                                        const MIN_DB: f64 = -70.0; // Adjust this if needed
+                                        const MAX_DB: f64 = 0.0; // 0 dB represents maximum volume
 
-                                    let volume_percentage = ((db - MIN_DB) / (MAX_DB - MIN_DB)
-                                        * 100.0)
-                                        .clamp(0.0, 100.0);
+                                        // Convert RMS to decibels, then to percentage
+                                        // Convert RMS to decibels, then to percentage
+                                        let db = if rms > 0.0 {
+                                            20.0 * rms.log10()
+                                        } else {
+                                            MIN_DB
+                                        };
 
-                                    // info!("Volume {user_id} {volume_percentage:00?}");
+                                        let volume_percentage = ((db - MIN_DB) / (MAX_DB - MIN_DB)
+                                            * 100.0)
+                                            .clamp(0.0, 100.0);
 
-                                    progress_div_ref.update(|prog_map| {
-                                        prog_map.insert(user_id, Some(volume_percentage));
+                                        // info!("Volume {user_id} {volume_percentage:00?}");
+
+                                        progress_div_ref.update(|prog_map| {
+                                            prog_map.insert(user_id, Some(volume_percentage));
+                                        });
                                     });
                                 });
                             });
-                        });
+                            acs.update_value(|acs| {
+                                acs.insert(user_id, ac);
+                            });
+                        }
+                        Err(err) => warn!("Cant create audio context {err:?}"),
                     }
-                    Err(err) => warn!("Cant create audio context {err:?}"),
                 }
+            } else {
+                acs.update_value(|acs| {
+                    if let Some(ac) = acs.remove(&user_id) {
+                        progress_div_ref.update(|prog_map| {
+                            prog_map.remove(&user_id);
+                        });
+
+                        let _ = ac.close();
+                    }
+                });
             }
         }
     });

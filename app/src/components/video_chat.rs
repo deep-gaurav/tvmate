@@ -75,11 +75,11 @@ pub fn VideoChat() -> impl IntoView {
             {
                 if let Some(video) = video_ref.get_untracked() {
                     info!("Playing video");
-                    video.set_src_object(Some(&stream));
+                    video.set_src_object(stream.as_ref());
                     if let Err(err) = video.play() {
                         warn!("Cannot play audio {err:?}")
                     }
-                    is_video_active.set(true);
+                    is_video_active.set(stream.is_some());
                 } else {
                     info!("No video in ref");
                 }
@@ -277,7 +277,7 @@ pub fn VideoChatManager(
         if let Some((user, pc)) = rtc_getter.get() {
             let mut vu = video_users.get_untracked();
             if let Some(entry) = vu.get_mut(&user) {
-                entry.connection.set(Some(pc));
+                entry.connection.set(pc);
             }
             set_video_users.set(vu);
         }
@@ -365,7 +365,9 @@ pub fn VideoChatManager(
                                                             view! {
                                                                 <button class="flex flex-row hover:bg-white/20 px-4 py-1 gap-2 items-center"
                                                                     on:click=move|_|{
+                                                                        let rm = expect_context::<RoomManager>();
                                                                         pc.close();
+                                                                        let _= rm.close_vc(user.meta.get().id);
                                                                     }
                                                                 >
                                                                     "[ "

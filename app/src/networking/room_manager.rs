@@ -45,16 +45,16 @@ pub struct RoomManager {
         WriteSignal<Option<PlayerMessages>>,
     ),
     pub audio_chat_stream_signal: (
-        ReadSignal<Option<(Uuid, MediaStream)>>,
-        WriteSignal<Option<(Uuid, MediaStream)>>,
+        ReadSignal<Option<(Uuid, Option<MediaStream>)>>,
+        WriteSignal<Option<(Uuid, Option<MediaStream>)>>,
     ),
     pub video_chat_stream_signal: (
-        ReadSignal<Option<(Uuid, MediaStream)>>,
-        WriteSignal<Option<(Uuid, MediaStream)>>,
+        ReadSignal<Option<(Uuid, Option<MediaStream>)>>,
+        WriteSignal<Option<(Uuid, Option<MediaStream>)>>,
     ),
     pub rtc_signal: (
-        ReadSignal<Option<(Uuid, RtcPeerConnection)>>,
-        WriteSignal<Option<(Uuid, RtcPeerConnection)>>,
+        ReadSignal<Option<(Uuid, Option<RtcPeerConnection>)>>,
+        WriteSignal<Option<(Uuid, Option<RtcPeerConnection>)>>,
     ),
     pub ice_signal: (
         ReadSignal<Option<(Uuid, String)>>,
@@ -799,6 +799,26 @@ impl RoomManager {
         } else {
             Err(JsValue::from_str("Room not connected"))
         }
+    }
+
+    pub fn close_vc(&self, user: Uuid) -> Result<(), JsValue> {
+        let Some(room_info) = self.get_room_info().get_untracked() else {
+            return Err(JsValue::from_str("Room not connected"));
+        };
+
+        self.audio_chat_stream_signal.1.set(Some((user, None)));
+        self.video_chat_stream_signal.1.set(Some((user, None)));
+
+        self.audio_chat_stream_signal
+            .1
+            .set(Some((room_info.user_id, None)));
+        self.video_chat_stream_signal
+            .1
+            .set(Some((room_info.user_id, None)));
+
+        self.rtc_signal.1.set(Some((user, None)));
+
+        Ok(())
     }
 }
 

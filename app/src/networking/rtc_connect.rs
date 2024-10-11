@@ -98,9 +98,9 @@ pub async fn connect_to_user(
     rtc_config: &RtcConfig,
     video: bool,
     audio: bool,
-    video_media_setter: Callback<(Uuid, MediaStream), ()>,
-    audio_media_setter: Callback<(Uuid, MediaStream), ()>,
-    rtc_setter: Callback<(Uuid, RtcPeerConnection), ()>,
+    video_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
+    audio_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
+    rtc_setter: Callback<(Uuid, Option<RtcPeerConnection>), ()>,
 
     ice_callback: Callback<String>,
     session_callback: Callback<RTCSessionDesc>,
@@ -122,9 +122,9 @@ pub async fn connect_to_user(
                 let track = ev.track();
                 if let Ok(stream) = MediaStream::new_with_tracks(&Array::of1(&track)) {
                     if track.kind() == "audio" {
-                        audio_media_setter.call((user, stream));
+                        audio_media_setter.call((user, Some(stream)));
                     } else {
-                        video_media_setter.call((user, stream));
+                        video_media_setter.call((user, Some(stream)));
                     }
                 }
             },
@@ -139,8 +139,21 @@ pub async fn connect_to_user(
                 let pc = pc.clone();
                 move |_| {
                     let connection = pc.connection_state();
-                    if connection == RtcPeerConnectionState::Connected {
-                        rtc_setter.call((user, pc.clone()));
+                    info!("State changed to {connection:?}");
+
+                    match connection {
+                        RtcPeerConnectionState::Closed | RtcPeerConnectionState::Disconnected => {
+                            rtc_setter.call((user, None));
+                            video_media_setter.call((user, None));
+                            audio_media_setter.call((user, None));
+                            video_media_setter.call((self_id, None));
+                            audio_media_setter.call((self_id, None));
+                            pc.close();
+                        }
+                        RtcPeerConnectionState::Connected => {
+                            rtc_setter.call((user, Some(pc.clone())));
+                        }
+                        _ => {}
                     }
                 }
             },
@@ -174,7 +187,7 @@ pub async fn connect_to_user(
     {
         if let Ok(audio_stream) = MediaStream::new_with_tracks(&Array::of1(&audio)) {
             info!("Host: set audio");
-            audio_media_setter.call((self_id, audio_stream));
+            audio_media_setter.call((self_id, Some(audio_stream)));
         } else {
             warn!("Host: Cant make audio");
         }
@@ -186,7 +199,7 @@ pub async fn connect_to_user(
     {
         if let Ok(video_stream) = MediaStream::new_with_tracks(&Array::of1(&video)) {
             info!("Host: set video");
-            video_media_setter.call((self_id, video_stream));
+            video_media_setter.call((self_id, Some(video_stream)));
         } else {
             warn!("Host: Cant make video");
         }
@@ -254,9 +267,9 @@ pub fn receive_peer_connections(
 
     permissions_callback: Callback<Uuid, (bool, bool)>,
 
-    video_media_setter: Callback<(Uuid, MediaStream), ()>,
-    audio_media_setter: Callback<(Uuid, MediaStream), ()>,
-    rtc_setter: Callback<(Uuid, RtcPeerConnection), ()>,
+    video_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
+    audio_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
+    rtc_setter: Callback<(Uuid, Option<RtcPeerConnection>), ()>,
 
     ice_callback: Callback<(Uuid, String)>,
     session_callback: Callback<(Uuid, RTCSessionDesc)>,
@@ -322,15 +335,44 @@ pub fn receive_peer_connections(
                 with_owner(owner, || {
                     let _ = use_event_listener(
                         pc.clone(),
+                        leptos::ev::Custom::<leptos::ev::Event>::new("connectionstatechange"),
+                        {
+                            let pc = pc.clone();
+                            move |_| {
+                                let connection = pc.connection_state();
+                                info!("State changed to {connection:?}");
+                                match connection {
+                                    RtcPeerConnectionState::Closed
+                                    | RtcPeerConnectionState::Disconnected => {
+                                        rtc_setter.call((from_user, None));
+                                        video_media_setter.call((from_user, None));
+                                        audio_media_setter.call((from_user, None));
+                                        video_media_setter.call((self_id, None));
+                                        audio_media_setter.call((self_id, None));
+                                        pc.close();
+                                    }
+                                    RtcPeerConnectionState::Connected => {
+                                        rtc_setter.call((from_user, Some(pc.clone())));
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        },
+                    );
+                });
+
+                with_owner(owner, || {
+                    let _ = use_event_listener(
+                        pc.clone(),
                         leptos::ev::Custom::<RtcTrackEvent>::new("track"),
                         move |ev| {
                             info!("Peer: ev: track");
                             let track = ev.track();
                             if let Ok(stream) = MediaStream::new_with_tracks(&Array::of1(&track)) {
                                 if track.kind() == "audio" {
-                                    audio_media_setter.call((from_user, stream));
+                                    audio_media_setter.call((from_user, Some(stream)));
                                 } else {
-                                    video_media_setter.call((from_user, stream));
+                                    video_media_setter.call((from_user, Some(stream)));
                                 }
                             }
                         },
@@ -362,24 +404,6 @@ pub fn receive_peer_connections(
                                 ));
                             }
                         }
-
-                        with_owner(owner, || {
-                            let _ = use_event_listener(
-                                pc.clone(),
-                                leptos::ev::Custom::<leptos::ev::Event>::new(
-                                    "connectionstatechange",
-                                ),
-                                {
-                                    let pc = pc.clone();
-                                    move |_| {
-                                        let connection = pc.connection_state();
-                                        if connection == RtcPeerConnectionState::Connected {
-                                            rtc_setter.call((from_user, pc.clone()));
-                                        }
-                                    }
-                                },
-                            );
-                        });
 
                         with_owner(owner, || {
                             let _ = use_event_listener(
@@ -423,8 +447,8 @@ async fn accept_peer_connection(
 
     video: bool,
     audio: bool,
-    video_media_setter: Callback<(Uuid, MediaStream), ()>,
-    audio_media_setter: Callback<(Uuid, MediaStream), ()>,
+    video_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
+    audio_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
 ) -> Result<RTCSessionDesc, JsValue> {
     let local_stream = add_media_tracks(&pc, video, audio).await?;
 
@@ -434,7 +458,7 @@ async fn accept_peer_connection(
         .dyn_into::<MediaStreamTrack>()
     {
         if let Ok(audio_stream) = MediaStream::new_with_tracks(&Array::of1(&audio)) {
-            audio_media_setter.call((self_id, audio_stream));
+            audio_media_setter.call((self_id, Some(audio_stream)));
         }
     }
     if let Ok(video) = local_stream
@@ -443,7 +467,7 @@ async fn accept_peer_connection(
         .dyn_into::<MediaStreamTrack>()
     {
         if let Ok(video_stream) = MediaStream::new_with_tracks(&Array::of1(&video)) {
-            video_media_setter.call((self_id, video_stream));
+            video_media_setter.call((self_id, Some(video_stream)));
         }
     }
 
