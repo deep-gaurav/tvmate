@@ -6,7 +6,7 @@ use leptos::*;
 use leptos_use::{use_window_size, UseWindowSizeReturn};
 use tracing::{info, warn};
 use uuid::Uuid;
-use web_sys::RtcPeerConnection;
+use web_sys::{Element, RtcPeerConnection};
 
 use crate::{
     components::{
@@ -15,6 +15,7 @@ use crate::{
         toaster::{Toast, Toaster},
     },
     networking::room_manager::RoomManager,
+    MountPoints,
 };
 
 #[derive(Clone)]
@@ -181,53 +182,79 @@ pub fn VideoChat() -> impl IntoView {
         }
     });
 
+    let mount_points = expect_context::<MountPoints>();
+
+    let full_screen_element = move || {
+        if let Some(full_screen_ref) = mount_points.full_screen_point.get() {
+            if let Some(el) = full_screen_ref.get() {
+                let el: &Element = el.as_ref();
+                Some(el.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    };
     view! {
-        <Portal>
-            <div ref=div_ref class="fixed flex flex-col rounded-md cursor-grab z-50 touch-none overflow-hidden"
+        {
+            move || if let Some(el) = full_screen_element() {
+                view! {
+                    <Portal
+                        mount=el
+                    >
+                        <VideoChatConsent />
 
-                style=move||format!(
-                    "left: {}px; top: {}px; width: {}px",
-                    position.get().0,
-                    position.get().1,
-                    width.get()
-                )
+                        <div ref=div_ref class="fixed flex flex-col rounded-md cursor-grab z-50 touch-none overflow-hidden"
 
-                on:pointerdown=pointer_down
-                on:pointermove=pointer_move
+                            style=move||format!(
+                                "left: {}px; top: {}px; width: {}px",
+                                position.get().0,
+                                position.get().1,
+                                width.get()
+                            )
 
-                on:pointerup=pointer_up
-                on:pointercancel=pointer_up
-                on:pointerout=pointer_up
-                on:pointerleave=pointer_up
-            >
-                <For
-                    each=move||{
-                        let users = video_users.get().keys().cloned().collect::<Vec<_>>();
-                        users
-                    }
-                    key=|id|*id
-                    let:user_id
-                >
-                    {
-                        let user = create_memo(move |_| video_users.get_untracked().get(&user_id).cloned());
-                        move ||{
-                            if let Some(user) = user.get() {
-                                let video_ref= user.video_ref;
-                                let is_video_active = user.is_video_active;
-                                view! {
-                                    <video ref={video_ref}
-                                        class="w-full -scale-x-100"
-                                        class=("hidden", move || !is_video_active.get())
-                                    />
-                                }.into_view()
-                            }else{
-                                view! {}.into_view()
-                            }
-                        }
-                    }
-                </For>
-            </div>
-        </Portal>
+                            on:pointerdown=pointer_down
+                            on:pointermove=pointer_move
+
+                            on:pointerup=pointer_up
+                            on:pointercancel=pointer_up
+                            on:pointerout=pointer_up
+                            on:pointerleave=pointer_up
+                        >
+                            <For
+                                each=move||{
+                                    let users = video_users.get().keys().cloned().collect::<Vec<_>>();
+                                    users
+                                }
+                                key=|id|*id
+                                let:user_id
+                            >
+                                {
+                                    let user = create_memo(move |_| video_users.get_untracked().get(&user_id).cloned());
+                                    move ||{
+                                        if let Some(user) = user.get() {
+                                            let video_ref= user.video_ref;
+                                            let is_video_active = user.is_video_active;
+                                            view! {
+                                                <video ref={video_ref}
+                                                    class="w-full -scale-x-100"
+                                                    class=("hidden", move || !is_video_active.get())
+                                                />
+                                            }.into_view()
+                                        }else{
+                                            view! {}.into_view()
+                                        }
+                                    }
+                                }
+                            </For>
+                        </div>
+                    </Portal>
+                }.into_view()
+            }else{
+                view! {}.into_view()
+            }
+        }
     }
 }
 
@@ -286,8 +313,6 @@ pub fn VideoChatManager(
     });
 
     view! {
-        <VideoChatConsent />
-
         <Show when=move||is_open.get()>
             <div class="fixed w-full top-0 left-0 h-full z-50 text-white bg-black/40 flex justify-center items-center">
                 <div class="">

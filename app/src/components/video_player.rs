@@ -7,7 +7,7 @@ use logging::warn;
 use tracing::info;
 use wasm_bindgen::JsCast;
 
-use crate::networking::room_manager::RoomManager;
+use crate::{networking::room_manager::RoomManager, MountPoints};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum VideoState {
@@ -179,6 +179,11 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
     });
 
     let video_base_ref = create_node_ref::<leptos::html::Div>();
+
+    let mount_points = expect_context::<MountPoints>();
+
+    mount_points.full_screen_point.set(Some(video_base_ref));
+
     create_effect(move |_| {
         info!("Register fullscreenchange");
         let _ = use_event_listener(document(), leptos::ev::fullscreenchange, move |_| {

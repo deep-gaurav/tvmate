@@ -24,6 +24,7 @@ pub struct MountPoints {
     pub handle_point: NodeRef<leptos::html::Div>,
     pub side_point: NodeRef<leptos::html::Div>,
     pub speaker_point: NodeRef<leptos::html::Div>,
+    pub full_screen_point: RwSignal<Option<NodeRef<leptos::html::Div>>>,
 }
 
 #[derive(Clone)]
@@ -48,6 +49,7 @@ pub fn App() -> impl IntoView {
         handle_point,
         side_point,
         speaker_point,
+        full_screen_point: create_rw_signal(None),
     };
 
     provide_context(mount_points);
