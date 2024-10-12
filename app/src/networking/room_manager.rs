@@ -38,22 +38,27 @@ pub struct RoomManager {
         ReadSignal<Option<PlayerMessages>>,
         WriteSignal<Option<PlayerMessages>>,
     ),
+    #[allow(clippy::type_complexity)]
     pub audio_chat_stream_signal: (
         ReadSignal<Option<(Uuid, Option<MediaStream>)>>,
         WriteSignal<Option<(Uuid, Option<MediaStream>)>>,
     ),
+    #[allow(clippy::type_complexity)]
     pub video_chat_stream_signal: (
         ReadSignal<Option<(Uuid, Option<MediaStream>)>>,
         WriteSignal<Option<(Uuid, Option<MediaStream>)>>,
     ),
+    #[allow(clippy::type_complexity)]
     pub rtc_signal: (
         ReadSignal<Option<(Uuid, Option<RtcPeerConnection>)>>,
         WriteSignal<Option<(Uuid, Option<RtcPeerConnection>)>>,
     ),
+    #[allow(clippy::type_complexity)]
     pub ice_signal: (
         ReadSignal<Option<(Uuid, String)>>,
         WriteSignal<Option<(Uuid, String)>>,
     ),
+    #[allow(clippy::type_complexity)]
     pub sdp_signal: (
         ReadSignal<Option<(Uuid, RTCSessionDesc)>>,
         WriteSignal<Option<(Uuid, RTCSessionDesc)>>,
@@ -128,6 +133,7 @@ where
     pub socket: Signal<Option<WebSocket>>,
     pub ready_state: Signal<ConnectionReadyState>,
     pub chat_history: StoredValue<Vec<(UserMeta, String)>>,
+    #[allow(clippy::type_complexity)]
     pub chat_signal: (
         ReadSignal<Option<(UserMeta, String)>>,
         WriteSignal<Option<(UserMeta, String)>>,
@@ -753,6 +759,7 @@ impl RoomManager {
         })
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn get_chat_signal(
         &self,
     ) -> Option<(
@@ -848,12 +855,11 @@ impl RoomManager {
             return Err(JsValue::from_str("Room not connected"));
         };
 
-        if let Some((rtc_config, rtc_peers)) = rtc_config_peer {
+        if let Some((rtc_config, _rtc_peers)) = rtc_config_peer {
             let ice_signal = self.ice_signal.0;
             let session_signal = self.sdp_signal.0;
             let owner = self.owner;
 
-            let state = self.state.clone();
             let video_setter = self.video_chat_stream_signal.1;
             let audio_setter = self.audio_chat_stream_signal.1;
             let rtc_setter = self.rtc_signal.1;

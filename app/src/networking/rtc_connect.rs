@@ -86,6 +86,7 @@ pub async fn add_media_tracks(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn connect_to_user<F>(
     self_id: Uuid,
     user: Uuid,
@@ -294,6 +295,7 @@ where
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn receive_peer_connections<F>(
     self_id: Callback<(), Option<Uuid>>,
     rtc_config: Callback<(), Option<RtcConfig>>,
@@ -488,6 +490,7 @@ pub fn receive_peer_connections<F>(
     });
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn accept_peer_connection<F>(
     self_id: Uuid,
 
