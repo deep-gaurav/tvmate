@@ -10,20 +10,18 @@ use common::{
 use leptos::{
     create_effect, create_rw_signal, create_signal, expect_context, logging::warn, store_value,
     with_owner, Callback, Owner, ReadSignal, RwSignal, Signal, SignalGet, SignalGetUntracked,
-    SignalSet, SignalUpdate, SignalWith, SignalWithUntracked, StoredValue, WriteSignal,
+    SignalSet, SignalSetUntracked, SignalUpdate, SignalWith, SignalWithUntracked, StoredValue,
+    WriteSignal,
 };
 use leptos_router::use_navigate;
 use leptos_use::{
-    core::ConnectionReadyState, use_websocket_with_options,
-    UseWebSocketOptions, UseWebSocketReturn,
+    core::ConnectionReadyState, use_websocket_with_options, UseWebSocketOptions, UseWebSocketReturn,
 };
 use thiserror::Error;
 use tracing::info;
 use uuid::Uuid;
 use wasm_bindgen::{JsCast, JsValue};
-use web_sys::{
-    MediaStream, MediaStreamTrack, RtcIceCandidateInit, RtcPeerConnection, WebSocket,
-};
+use web_sys::{MediaStream, MediaStreamTrack, RtcIceCandidateInit, RtcPeerConnection, WebSocket};
 
 use crate::{
     components::toaster::{Toast, Toaster},
@@ -638,11 +636,13 @@ impl RoomManager {
                                     ClientMessage::ExchangeCandidate(_uuid, ice) => {
                                         info!("Received ice from {from_user} {ice}");
                                         ice_setter.set(Some((from_user, ice)));
+                                        sdp_setter.set_untracked(None);
                                     }
 
                                     ClientMessage::ReceivedSessionDesc(sdp) => {
                                         info!("Received sdp from {from_user} {sdp:?}");
                                         sdp_setter.set(Some((from_user, sdp)));
+                                        sdp_setter.set_untracked(None);
                                     }
                                     ClientMessage::RequestCall(_, video, audio) => {
                                         info!("Receivedd vc request");

@@ -113,6 +113,9 @@ where
     info!("Host user");
     let pc = connect_rtc(rtc_config)?;
 
+    let is_closed = store_value(false);
+    let pending_ice = store_value(Some(vec![]));
+
     with_owner(owner, || {
         let _ = use_event_listener(
             pc.clone(),
@@ -151,6 +154,7 @@ where
                             close_self.call(());
 
                             pc.close();
+                            is_closed.set_value(true);
                         }
                         RtcPeerConnectionState::Connected => {
                             rtc_setter.call((user, Some(pc.clone())));
@@ -224,6 +228,9 @@ where
         create_effect({
             let pc = pc.clone();
             move |_| {
+                if is_closed.get_value() {
+                    return;
+                }
                 if let Some((id, rtcsession_desc)) = session_signal.get() {
                     info!("Host: received sdp {id} {rtcsession_desc:?}");
                     if id == user {
@@ -239,6 +246,15 @@ where
                                         pc.set_remote_description(&rtc_sdp),
                                     )
                                     .await;
+                                    pending_ice.update_value(|p_ice|{
+                                        if let Some(p_ice) = p_ice.take() {
+                                            for candidate in p_ice {
+                                                let _ = pc.add_ice_candidate_with_opt_rtc_ice_candidate_init(Some(
+                                                    &candidate,
+                                                ));
+                                            }
+                                        }
+                                    });
                                 }
                             });
                         }
@@ -247,13 +263,26 @@ where
             }
         });
         create_effect(move |_| {
+            if is_closed.get_value() {
+                return;
+            }
             if let Some((id, candidate)) = ice_signal.get() {
                 info!("Host: received ice {id} {candidate}");
 
                 if id == user {
                     if let Ok(candidate) = deserialize_candidate(&candidate) {
-                        let _ =
-                            pc.add_ice_candidate_with_opt_rtc_ice_candidate_init(Some(&candidate));
+                        info!("Add ice, is_closed {}", is_closed.get_value());
+                        if pending_ice.with_value(|p| p.is_some()) {
+                            pending_ice.update_value(|p| {
+                                if let Some(p) = p {
+                                    p.push(candidate);
+                                }
+                            });
+                        } else {
+                            let _ = pc.add_ice_candidate_with_opt_rtc_ice_candidate_init(Some(
+                                &candidate,
+                            ));
+                        }
                     } else {
                         warn!("Cant deserialize candidate")
                     }
@@ -295,6 +324,7 @@ pub fn receive_peer_connections<F>(
         if let Some((from_user, candidate)) = ice_signal.get() {
             if let Ok(candidate) = deserialize_candidate(&candidate) {
                 if let Some(pc) = peers.with_value(|peers| peers.get(&from_user).cloned()) {
+                    info!("add ice to pc");
                     let _ = pc.add_ice_candidate_with_opt_rtc_ice_candidate_init(Some(&candidate));
                 } else {
                     pending_candidates.update_value(|ice| {
@@ -355,6 +385,11 @@ pub fn receive_peer_connections<F>(
                                 match connection {
                                     RtcPeerConnectionState::Closed
                                     | RtcPeerConnectionState::Disconnected => {
+                                        peers.update_value(|p| {
+                                            info!("disconnected, remove pc");
+                                            p.remove(&from_user);
+                                        });
+
                                         rtc_setter.call((from_user, None));
                                         video_media_setter.call((from_user, None));
                                         audio_media_setter.call((from_user, None));
