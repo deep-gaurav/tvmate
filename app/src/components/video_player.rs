@@ -7,7 +7,11 @@ use logging::warn;
 use tracing::info;
 use wasm_bindgen::JsCast;
 
-use crate::{networking::room_manager::RoomManager, MountPoints};
+use crate::{
+    components::toaster::{Toast, Toaster},
+    networking::room_manager::RoomManager,
+    MountPoints,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum VideoState {
@@ -417,9 +421,14 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                     <div class="absolute top-[85%] left-[5%]">
                         <button on:click=move |_| {
                             if let Some(video_base) = video_base_ref.get_untracked() {
+                                let toaster = expect_context::<Toaster>();
                                 if !is_full_screen.get_untracked() {
                                     if let Err(err) = video_base.request_fullscreen() {
-                                        warn!("Cannot enter full screen {err:?}")
+                                        warn!("Cannot enter full screen {err:?}");
+                                        toaster.toast(Toast{
+                                            message: format!("Full screen failed {err:?}").into(),
+                                            r#type: crate::components::toaster::ToastType::Failed,
+                                        });
                                     } else if let Ok(screen) = window().screen() {
                                         if let Err(err) = screen
                                             .orientation()
