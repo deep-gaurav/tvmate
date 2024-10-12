@@ -102,11 +102,12 @@ async fn leptos_routes_handler(
     let handler = leptos_axum::render_route_with_context(
         app_state.leptos_options.clone(),
         app_state.routes.clone(),
-        || {
+        move || {
             let endpoint = Endpoint {
                 main_endpoint: std::borrow::Cow::Borrowed(""),
             };
             provide_context(endpoint);
+            provide_context(app_state.rooms.clone());
         },
         App,
     );
@@ -114,15 +115,16 @@ async fn leptos_routes_handler(
 }
 
 async fn server_fn_handler(
-    State(_app_state): State<AppState>,
+    State(app_state): State<AppState>,
     request: Request<Body>,
 ) -> impl IntoResponse {
     handle_server_fns_with_context(
-        || {
+        move || {
             let endpoint = Endpoint {
                 main_endpoint: std::borrow::Cow::Borrowed(""),
             };
             provide_context(endpoint);
+            provide_context(app_state.rooms.clone());
         },
         request,
     )

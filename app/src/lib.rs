@@ -13,6 +13,7 @@ use pages::room::RoomPage;
 
 use crate::pages::home_page::HomePage;
 
+pub mod apis;
 pub mod components;
 pub mod error_template;
 pub mod networking;
@@ -101,7 +102,7 @@ pub fn App() -> impl IntoView {
                     <div class="absolute left-[7%] w-[68%] top-[11%] h-[79%] bg-slate-800">
                         <Routes>
                             <Route path="" view=HomePage />
-                            <Route path="room/:id" view=RoomPage />
+                            <Route ssr=SsrMode::PartiallyBlocked path="room/:id" view=RoomPage />
                         </Routes>
                     </div>
                     <div

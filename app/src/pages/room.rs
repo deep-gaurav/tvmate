@@ -1,10 +1,11 @@
 use leptos::*;
-use leptos_meta::Title;
+use leptos_meta::{Meta, Title};
 use leptos_router::*;
 use tracing::info;
 use wasm_bindgen::{JsCast, UnwrapThrowExt};
 
 use crate::{
+    apis::get_room_info,
     components::{
         audio_chat::AudioChat, chatbox::ChatBox, join_dialog::JoinDialog, room_info::RoomInfo,
         video_chat::VideoChat, video_player::VideoPlayer,
@@ -46,6 +47,17 @@ pub fn RoomPage() -> impl IntoView {
         }
     });
 
+    let room_meta = create_blocking_resource(
+        move || params.get().map(|param| param.id).ok().flatten(),
+        |room_id| async move {
+            if let Some(room_id) = room_id {
+                get_room_info(room_id).await
+            } else {
+                Err(ServerFnError::new("room id doesnt exist"))
+            }
+        },
+    );
+
     view! {
         <JoinDialog
             is_open=join_dialog_open
@@ -64,12 +76,31 @@ pub fn RoomPage() -> impl IntoView {
                 })
             }
         />
+        <Suspense>
+            {
+                move || if let Some(Ok(Some(room_meta))) = room_meta.get(){
+                    view! {
+                        <Title text=format!("TVMate | {}", &room_meta.room_id) />
+                        <Meta property="og:title" content=format!("TVMate | {}", &room_meta.room_id) />
+                        <Meta property="og:description" content=format!("Join {} to have watch party together", &room_meta.host) />
+                        <meta property="og:type" content="website" />
+                        <Meta name="description" content=format!("Join {} to have watch party together", &room_meta.host) />
+                    }.into_view()
+                }else{
+                    view! {
+                        <Meta name="description" content="Let's have watch party together" />
+                    }.into_view()
+                }
+            }
+        </Suspense>
+
         {move || {
             if let Ok(RoomParam { id: Some(room_id) }) = params.get() {
                 if !room_id.is_empty() {
+
                     view! {
-                        <Title text=format!("Room {room_id}") />
                         <VideoPlayer src=video_url />
+
                         {move || {
                             if is_csr.get() {
                                 view! {
@@ -135,5 +166,6 @@ pub fn RoomPage() -> impl IntoView {
                 view! { <Redirect path="/" /> }.into_view()
             }
         }}
+
     }
 }

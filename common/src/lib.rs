@@ -23,6 +23,16 @@ pub enum UserState {
     VideoSelected(String),
 }
 
+impl UserState {
+    pub fn as_video_selected(&self) -> Option<&String> {
+        if let Self::VideoSelected(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PlayerStatus {
     Paused(f64),
