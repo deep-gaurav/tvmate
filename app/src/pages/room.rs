@@ -79,16 +79,20 @@ pub fn RoomPage() -> impl IntoView {
         <Suspense>
             {
                 move || if let Some(Ok(Some(room_meta))) = room_meta.get(){
+                    let description = if let Some(video) = room_meta.selected_video {
+                        format!("{} is inviting you to watch {video} together", room_meta.host)
+                    }else{
+                        format!("{} is inviting you to have watch party together", room_meta.host)
+                    };
                     view! {
-                        <Title text=format!("TVMate | {}", &room_meta.room_id) />
-                        <Meta property="og:title" content=format!("TVMate | {}", &room_meta.room_id) />
-                        <Meta property="og:description" content=format!("Join {} to have watch party together", &room_meta.host) />
-                        <meta property="og:type" content="website" />
-                        <Meta name="description" content=format!("Join {} to have watch party together", &room_meta.host) />
+                        <Title text=format!("TVMate | Room {}", &room_meta.room_id) />
+                        <Meta property="og:title" content=format!("TVMate | Room {}", &room_meta.room_id) />
+                        <Meta property="og:description" content=description.clone() />
+                        <Meta property="og:type" content="website" />
+                        <Meta name="description" content=description />
                     }.into_view()
                 }else{
                     view! {
-                        <Meta name="description" content="Let's have watch party together" />
                     }.into_view()
                 }
             }
