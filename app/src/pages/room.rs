@@ -6,8 +6,8 @@ use wasm_bindgen::{JsCast, UnwrapThrowExt};
 
 use crate::{
     components::{
-        audio_chat::AudioChat, chatbox::ChatBox, room_info::RoomInfo, video_chat::VideoChat,
-        video_player::VideoPlayer,
+        audio_chat::AudioChat, chatbox::ChatBox, join_dialog::JoinDialog, room_info::RoomInfo,
+        video_chat::VideoChat, video_player::VideoPlayer,
     },
     networking::room_manager::RoomManager,
 };
@@ -23,16 +23,47 @@ pub fn RoomPage() -> impl IntoView {
     let (video_name, set_video_name) = create_signal(None);
 
     let room_manager = expect_context::<RoomManager>();
-    create_effect(move |_| {
-        if let Some(video_name) = video_name.get() {
-            room_manager.set_selected_video(video_name);
+    create_effect({
+        let room_manager = room_manager.clone();
+        move |_| {
+            if let Some(video_name) = video_name.get() {
+                room_manager.set_selected_video(video_name);
+            }
         }
     });
 
     let (is_csr, set_is_csr) = create_signal(false);
     create_effect(move |_| set_is_csr.set(true));
 
+    let (join_dialog_open, set_join_dialog_open) = create_signal(false);
+
+    let room_info = room_manager.get_room_info();
+    create_effect(move |_| {
+        if room_info.with(|r| r.is_none()) {
+            set_join_dialog_open.set(true);
+        } else {
+            set_join_dialog_open.set(false);
+        }
+    });
+
     view! {
+        <JoinDialog
+            is_open=join_dialog_open
+            on_close=Callback::new(move|_|{
+                set_join_dialog_open.set(false);
+            })
+            init_room_code={
+                create_memo(move |_| {
+                    if let Ok(RoomParam { id: Some(room_id) }) = params.get() {
+                        info!("Room id {room_id}");
+                        room_id
+                    }else{
+                        info!("Room id empty");
+                        "".to_string()
+                    }
+                })
+            }
+        />
         {move || {
             if let Ok(RoomParam { id: Some(room_id) }) = params.get() {
                 if !room_id.is_empty() {

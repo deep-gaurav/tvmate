@@ -8,6 +8,7 @@ use wasm_bindgen::{JsCast, JsValue};
 use web_sys::js_sys;
 
 use crate::components::dialog::Dialog;
+use crate::components::join_dialog::JoinDialog;
 use crate::components::toaster::{Toast, Toaster};
 use crate::networking::room_manager::RoomManager;
 
@@ -86,79 +87,13 @@ pub fn HomePage() -> impl IntoView {
             }}
         </Dialog>
 
-        <Dialog
-            is_self_sized=false
+        <JoinDialog
             is_open=join_open
-            on_close=move |_| {
+            on_close=Callback::new(move|_|{
                 set_join_open.set(false);
-            }
-        >
-            {
-                let (name, set_name) = create_signal(String::new());
-                let (room_code, set_room_code) = create_signal(String::new());
-                view! {
-                    <h3 class="font-bold2  text-xl text-center w-full">"Join"</h3>
-
-                    <div class="h-4" />
-
-                    <div class="flex items-center">
-                        <label class=" font-thin8 text-sm" for="name">
-                            "Name: "
-                        </label>
-                        <input
-                            class="bg-white/10 focus:outline-white/50  text-md font-thin8 p-2"
-                            name="name"
-                            type="text"
-                            placeholder="Enter your name"
-                            on:input=move |ev| {
-                                set_name.set(event_target_value(&ev));
-                            }
-                        />
-                    </div>
-
-                    <div class="flex items-center">
-                        <label class=" font-thin8 text-sm" for="roomid">
-                            "Room Id: "
-                        </label>
-                        <input
-                            class="bg-white/10 focus:outline-white/50  text-md font-thin8 p-2"
-                            name="roomid"
-                            type="text"
-                            placeholder="Room Id"
-                            on:input=move |ev| {
-                                set_room_code.set(event_target_value(&ev));
-                            }
-                        />
-                    </div>
-
-                    <div class="h-4" />
-
-                    <button
-                        class="text-sm hover:bg-white/20 self-center px-4 py-1"
-                        type="button"
-                        on:click=move |_| {
-                            if name.get_untracked().is_empty()
-                                || room_code.get_untracked().is_empty()
-                            {
-                                warn!("Name cant be empty");
-                            } else {
-                                let room_manager = expect_context::<RoomManager>();
-                                if let Err(err) = room_manager
-                                    .host_join(
-                                        name.get_untracked(),
-                                        Some(room_code.get_untracked()),
-                                    )
-                                {
-                                    warn!("Cannot join {err:#?}");
-                                }
-                            }
-                        }
-                    >
-                        "[ Join Room ]"
-                    </button>
-                }
-            }
-        </Dialog>
+            })
+            init_room_code=""
+        />
         <div class="h-full w-full flex flex-col items-center justify-center ">
 
             <div class="flex-grow" />
