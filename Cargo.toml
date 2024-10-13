@@ -106,6 +106,8 @@ features = [
     "TouchEvent",
     "Touch",
     "TouchList",
+
+    "ShareData",
 ]
 
 # See https://github.com/akesson/cargo-leptos for documentation of all the parameters.

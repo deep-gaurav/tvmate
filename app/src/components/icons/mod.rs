@@ -9,6 +9,7 @@ pub enum Icons {
     Video,
     VideoOff,
     CallEnd,
+    Share,
 }
 
 impl Icons {
@@ -22,6 +23,7 @@ impl Icons {
             Icons::Video => include_str!("video.svg"),
             Icons::VideoOff => include_str!("video_off.svg"),
             Icons::CallEnd => include_str!("end_call.svg"),
+            Icons::Share => include_str!("share.svg"),
         }
     }
 }
