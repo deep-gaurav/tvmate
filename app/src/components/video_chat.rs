@@ -185,13 +185,9 @@ pub fn VideoChat() -> impl IntoView {
     let mount_points = expect_context::<MountPoints>();
 
     let full_screen_element = move || {
-        if let Some(full_screen_ref) = mount_points.full_screen_point.get() {
-            if let Some(el) = full_screen_ref.get() {
-                let el: &Element = el.as_ref();
-                Some(el.clone())
-            } else {
-                None
-            }
+        if let Some(el) = mount_points.main_point.get() {
+            let el: &Element = el.as_ref();
+            Some(el.clone())
         } else {
             None
         }

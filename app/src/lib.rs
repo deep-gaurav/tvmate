@@ -24,7 +24,7 @@ pub struct MountPoints {
     pub handle_point: NodeRef<leptos::html::Div>,
     pub side_point: NodeRef<leptos::html::Div>,
     pub speaker_point: NodeRef<leptos::html::Div>,
-    pub full_screen_point: RwSignal<Option<NodeRef<leptos::html::Div>>>,
+    pub main_point: NodeRef<leptos::html::Div>,
 }
 
 #[derive(Clone)]
@@ -44,12 +44,13 @@ pub fn App() -> impl IntoView {
     let handle_point = create_node_ref();
     let side_point = create_node_ref();
     let speaker_point = create_node_ref();
+    let main_point = create_node_ref();
 
     let mount_points = MountPoints {
         handle_point,
         side_point,
         speaker_point,
-        full_screen_point: create_rw_signal(None),
+        main_point,
     };
 
     provide_context(mount_points);
@@ -102,10 +103,14 @@ pub fn App() -> impl IntoView {
                 >
                     <div class="h-full w-full absolute bg-cover bg-center bg-no-repeat bg-[url('/assets/images/synced_crt.png')] z-10 pointer-events-none" />
                     <div class="absolute left-[7%] w-[68%] top-[11%] h-[79%] bg-slate-800">
-                        <Routes>
-                            <Route path="" view=HomePage />
-                            <Route ssr=SsrMode::PartiallyBlocked path="room/:id" view=RoomPage />
-                        </Routes>
+                        <div ref=main_point
+                            class="relative w-full h-full"
+                        >
+                            <Routes>
+                                <Route path="" view=HomePage />
+                                <Route ssr=SsrMode::PartiallyBlocked path="room/:id" view=RoomPage />
+                            </Routes>
+                        </div>
                     </div>
                     <div
                         class="absolute left-[81.5%] w-[16%] top-[6%] h-[30%] z-20"

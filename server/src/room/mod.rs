@@ -220,6 +220,7 @@ async fn handle_websocket(
                                                                             if let Err(err) = sender.send(Message::ServerMessage(common::message::ServerMessage::Error("Cant send vc request, Try after some time".to_string()))).await{
                                                                                 warn!("Failed to send error {err:?}");
                                                                             }
+                                                                            info!("Frequent request, ignoring");
                                                                             break 'b;
                                                                         }
 
@@ -234,6 +235,8 @@ async fn handle_websocket(
                                                                         if let Err(err) = sender.send(Message::ClientMessage((*sender_id, ClientMessage::RequestCall(*sender_id, *video, *audio)))).await{
                                                                             warn!("Failed send vc request {err:?}");
                                                                         }
+                                                                    }else{
+                                                                        warn!("User doesnt exist, cant send vc request")
                                                                     }
                                                                 },
                                                                 common::message::ClientMessage::ReceivedSessionDesc(_rtcsession_desc) => {
@@ -317,7 +320,7 @@ impl IntoResponse for RoomJoinError {
                 | RoomProviderError::HmacError(_) => {
                     (StatusCode::INTERNAL_SERVER_ERROR, format!("{err:#?}")).into_response()
                 }
-                RoomProviderError::RoomDoesntExist => {
+                RoomProviderError::RoomDoesntExist | RoomProviderError::RoomFull => {
                     (StatusCode::BAD_REQUEST, format!("{err:#?}")).into_response()
                 }
             },

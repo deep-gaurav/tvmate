@@ -78,6 +78,8 @@ mod ssr {
     use super::*;
     use std::{collections::HashMap, env::VarError, sync::Arc, time::SystemTimeError};
 
+    const MAX_ROOM_SIZE: usize = 2;
+
     #[derive(Clone, Default)]
     pub struct RoomProvider {
         rooms: Arc<RwLock<HashMap<UniCase<String>, Room>>>,
@@ -89,6 +91,9 @@ mod ssr {
         KeyGenerationFailed,
         #[error("given room does not exist")]
         RoomDoesntExist,
+
+        #[error("Room is full, try creating new room")]
+        RoomFull,
 
         #[error("RTCConfig Generation Failed")]
         RTCConfigGenerationFailed(#[from] VarError),
@@ -144,6 +149,9 @@ mod ssr {
             let mut rooms = self.rooms.write().await;
             let user_id = user.meta.id;
             if let Some(room) = rooms.get_mut(&UniCase::from(room_id)) {
+                if room.users.len() >= MAX_ROOM_SIZE {
+                    return Err(RoomProviderError::RoomFull);
+                }
                 room.users.push(user);
                 let rtc_config = get_rtc_info(&user_id.to_string()).await?;
                 Ok(RoomJoinInfo {

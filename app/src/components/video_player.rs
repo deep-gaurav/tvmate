@@ -182,12 +182,9 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
         }
     });
 
-    let video_base_ref = create_node_ref::<leptos::html::Div>();
-
     let mount_points = expect_context::<MountPoints>();
 
-    mount_points.full_screen_point.set(Some(video_base_ref));
-
+    let main_ref = mount_points.main_point;
     create_effect(move |_| {
         info!("Register fullscreenchange");
         let _ = use_event_listener(document(), leptos::ev::fullscreenchange, move |_| {
@@ -200,7 +197,6 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
 
     view! {
         <div
-            ref=video_base_ref
             class="h-full w-full flex flex-col"
             class=("hidden", move || src.with(|v| v.is_none()))
         >
@@ -267,60 +263,67 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                     }}
                 </video>
 
-                {if let Some((message_signal, message_history)) = expect_context::<RoomManager>()
-                    .get_chat_signal()
                 {
-                    let (msg_len, set_msg_len) = create_signal(
-                        message_history.with_value(|v| v.len()),
-                    );
-                    let (is_visible, set_is_visible) = create_signal(false);
-                    let UseTimeoutFnReturn {
-                        start: start_visible_timeout,
-                        stop: stop_visible_tiemout,
-                        ..
-                    } = use_timeout_fn(
-                        move |_| {
-                            set_is_visible.set(false);
-                        },
-                        5000.0,
-                    );
-                    create_effect(move |_| {
-                        message_signal.with(|_| ());
-                        set_msg_len.set(message_history.with_value(|v| v.len()));
-                        set_is_visible.set(true);
-                        stop_visible_tiemout();
-                        start_visible_timeout(());
-                    });
-                    view! {
-                        <div
-                            class="absolute w-[20%] overflow-auto break-words right-0 top-[35%] h-[30%] flex flex-col-reverse"
-                            class=("hidden", move || !(is_full_screen.get() && is_visible.get()))
-                        >
-                            <For
-                                each=move || {
-                                    let len = msg_len.get();
-                                    (0..len).rev()
-                                }
-                                key=|i| *i
-                                children=move |i| {
-                                    let msg = message_history.with_value(|v| v.get(i).cloned());
-                                    if let Some((user, msg)) = msg {
-                                        view! {
-                                            <div class="w-full text-md font-thin14 [text-shadow:_0_1px_0_rgb(0_0_0_/_40%)]">
-                                                <span class="font-thin8 text-sm">{user.name} ": "</span>
-                                                <span>{msg}</span>
-                                            </div>
-                                        }
-                                            .into_view()
-                                    } else {
-                                        view! {}.into_view()
+                    let r_i = expect_context::<RoomManager>().get_room_info();
+                    let is_connected = create_memo(move|_|r_i.with(|r|r.is_some()));
+                move || if is_connected.get() {
+                    if let Some((message_signal, message_history)) = expect_context::<RoomManager>()
+                    .get_chat_signal()
+                    {
+                        let (msg_len, set_msg_len) = create_signal(
+                            message_history.with_value(|v| v.len()),
+                        );
+                        let (is_visible, set_is_visible) = create_signal(false);
+                        let UseTimeoutFnReturn {
+                            start: start_visible_timeout,
+                            stop: stop_visible_tiemout,
+                            ..
+                        } = use_timeout_fn(
+                            move |_| {
+                                set_is_visible.set(false);
+                            },
+                            5000.0,
+                        );
+                        create_effect(move |_| {
+                            message_signal.with(|_| ());
+                            set_msg_len.set(message_history.with_value(|v| v.len()));
+                            set_is_visible.set(true);
+                            stop_visible_tiemout();
+                            start_visible_timeout(());
+                        });
+                        view! {
+                            <div
+                                class="absolute w-[20%] overflow-auto break-words right-0 top-[35%] h-[30%] flex flex-col-reverse"
+                                class=("hidden", move || !( is_visible.get()))
+                            >
+                                <For
+                                    each=move || {
+                                        let len = msg_len.get();
+                                        (0..len).rev()
                                     }
-                                }
-                            />
-                        </div>
+                                    key=|i| *i
+                                    children=move |i| {
+                                        let msg = message_history.with_value(|v| v.get(i).cloned());
+                                        if let Some((user, msg)) = msg {
+                                            view! {
+                                                <div class="w-full text-md font-thin14 [text-shadow:_0_1px_0_rgb(0_0_0_/_40%)]">
+                                                    <span class="font-thin8 text-sm">{user.name} ": "</span>
+                                                    <span>{msg}</span>
+                                                </div>
+                                            }
+                                                .into_view()
+                                        } else {
+                                            view! {}.into_view()
+                                        }
+                                    }
+                                />
+                            </div>
+                        }
+                            .into_view()
+                    } else {
+                        view! {}.into_view()
                     }
-                        .into_view()
-                } else {
+                }else{
                     view! {}.into_view()
                 }}
                 <div
@@ -420,7 +423,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
 
                     <div class="absolute top-[85%] left-[5%]">
                         <button on:click=move |_| {
-                            if let Some(video_base) = video_base_ref.get_untracked() {
+                            if let Some(video_base) = main_ref.get_untracked() {
                                 let toaster = expect_context::<Toaster>();
                                 if !is_full_screen.get_untracked() {
                                     if let Err(err) = video_base.request_fullscreen() {
