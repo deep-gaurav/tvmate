@@ -553,6 +553,12 @@ impl RoomManager {
                                             room_info_writer.set(Some(room_info));
                                         }
                                     }
+                                    common::message::ServerMessage::Error(error) => {
+                                        toaster.toast(Toast {
+                                            message: error.into(),
+                                            r#type: crate::components::toaster::ToastType::Failed,
+                                        });
+                                    }
                                 },
                                 Message::ClientMessage((from_user, message)) => match message {
                                     common::message::ClientMessage::SelectedVideo(video_name) => {

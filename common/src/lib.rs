@@ -4,6 +4,8 @@ pub mod message_sender;
 pub mod params;
 pub mod util;
 
+use std::time::Instant;
+
 use message::Message;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -15,6 +17,8 @@ pub struct User {
     pub meta: UserMeta,
     #[cfg(feature = "ssr")]
     pub sender: tokio::sync::mpsc::Sender<Message>,
+    #[cfg(feature = "ssr")]
+    pub last_chat_request: Option<Instant>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

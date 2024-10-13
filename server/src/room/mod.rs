@@ -40,6 +40,7 @@ pub async fn host_room(
             state: common::UserState::VideoNotSelected,
         },
         sender: tx,
+        last_chat_request: None,
     };
     let room_id = app_state.rooms.new_room(user).await;
 
@@ -76,6 +77,7 @@ pub async fn join_room(
             state: common::UserState::VideoNotSelected,
         },
         sender: tx,
+        last_chat_request: None,
     };
 
     let join_info = match app_state
@@ -210,13 +212,27 @@ async fn handle_websocket(
                                                                         }
                                                                     }
                                                                 },
-                                                                common::message::ClientMessage::RequestCall(uuid, video,audio) => {
-                                                                    let sender = app_state.rooms.with_room(room_id, |room| {
-                                                                        room.users.iter().find(|user|user.meta.id == *uuid).map(|user| user.sender.clone())
+                                                                common::message::ClientMessage::RequestCall(uuid, video,audio) => 'b:{
+                                                                    if let Some((Some(last_send), sender)) = app_state.rooms.with_room(room_id,|room|{
+                                                                        room.users.iter().find(|user|user.meta.id == *sender_id).map(|u|(u.last_chat_request, u.sender.clone()))
+                                                                    }).await.flatten() {
+                                                                        if std::time::Instant::now().duration_since(last_send) < std::time::Duration::from_secs(60) {
+                                                                            if let Err(err) = sender.send(Message::ServerMessage(common::message::ServerMessage::Error("Cant send vc request, Try after some time".to_string()))).await{
+                                                                                warn!("Failed to send error {err:?}");
+                                                                            }
+                                                                            break 'b;
+                                                                        }
+
+                                                                    }
+                                                                    let sender = app_state.rooms.with_room_mut(room_id, |room| {
+                                                                        room.users.iter_mut().find(|user|user.meta.id == *uuid).map(|user| {
+                                                                            user.last_chat_request = Some(std::time::Instant::now()) ;
+                                                                            user.sender.clone()
+                                                                        })
                                                                     }).await.flatten();
                                                                     if let Some(sender) = sender {
                                                                         if let Err(err) = sender.send(Message::ClientMessage((*sender_id, ClientMessage::RequestCall(*sender_id, *video, *audio)))).await{
-                                                                            warn!("Failed send session desc {err:?}");
+                                                                            warn!("Failed send vc request {err:?}");
                                                                         }
                                                                     }
                                                                 },

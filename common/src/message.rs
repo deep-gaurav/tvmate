@@ -30,6 +30,8 @@ pub enum ServerMessage {
     RoomJoined(RoomJoinInfo),
     UserJoined(UserJoined),
     UserLeft(UserLeft),
+
+    Error(String),
     // RtcConfig(RtcConfig),
 }
 
