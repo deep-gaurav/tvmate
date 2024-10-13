@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use common::UserMeta;
-use ev::PointerEvent;
+use ev::{MouseEvent, PointerEvent};
 use leptos::*;
 use leptos_use::{use_window_size, UseWindowSizeReturn};
 use tracing::{info, warn};
@@ -201,7 +201,10 @@ pub fn VideoChat() -> impl IntoView {
                     >
                         <VideoChatConsent />
 
-                        <div ref=div_ref class="fixed flex flex-col rounded-md cursor-grab z-50 touch-none overflow-hidden"
+                        <div
+                            ref=div_ref
+
+                            class="fixed flex flex-col rounded-md cursor-grab z-50 touch-none overflow-hidden p-2"
 
                             style=move||format!(
                                 "left: {}px; top: {}px; width: {}px",
@@ -209,41 +212,114 @@ pub fn VideoChat() -> impl IntoView {
                                 position.get().1,
                                 width.get()
                             )
-
-                            on:pointerdown=pointer_down
-                            on:pointermove=pointer_move
-
-                            on:pointerup=pointer_up
-                            on:pointercancel=pointer_up
-                            on:pointerout=pointer_up
-                            on:pointerleave=pointer_up
                         >
-                            <For
-                                each=move||{
-                                    let users = video_users.get().keys().cloned().collect::<Vec<_>>();
-                                    users
+                            {
+                                let is_down = create_rw_signal(false);
+                                let p_down = move|ev:MouseEvent| {
+                                    is_down.set(true);
+                                    ev.prevent_default();
+                                };
+                                let p_up = move|ev:MouseEvent| {
+                                    is_down.set(false);
+                                    ev.prevent_default();
+                                };
+                                let p_move = move|ev:MouseEvent| {
+                                    if is_down.get_untracked(){
+                                        set_width.set(width.get_untracked()+ev.movement_x() as f64);
+                                    }
+                                    ev.prevent_default();
+                                };
+
+
+                                view! {
+                                    <div
+                                        class="absolute w-full h-[calc(100%-1em)] left-2 top-2 bg-transparent cursor-ew-resize"
+                                        on:mousedown=p_down
+                                        on:mouseup=p_up
+                                        on:mouseleave=p_up
+                                        on:mouseout=p_up
+                                        on:mousecancel=p_up
+
+                                        on:mousemove=p_move
+                                    />
                                 }
-                                key=|id|*id
-                                let:user_id
-                            >
-                                {
-                                    let user = create_memo(move |_| video_users.get_untracked().get(&user_id).cloned());
-                                    move ||{
-                                        if let Some(user) = user.get() {
-                                            let video_ref= user.video_ref;
-                                            let is_video_active = user.is_video_active;
-                                            view! {
-                                                <video ref={video_ref}
-                                                    class="w-full -scale-x-100"
-                                                    class=("hidden", move || !is_video_active.get())
-                                                />
-                                            }.into_view()
-                                        }else{
-                                            view! {}.into_view()
+                            }
+
+                            {
+                                let is_down = create_rw_signal(false);
+                                let p_down = move|ev:MouseEvent| {
+                                    is_down.set(true);
+                                    ev.prevent_default();
+                                };
+                                let p_up = move|ev:MouseEvent| {
+                                    is_down.set(false);
+                                    ev.prevent_default();
+                                };
+                                let p_move = move|ev:MouseEvent| {
+                                    if is_down.get_untracked(){
+                                        if let Some(div) = div_ref.get_untracked() {
+                                            let (width, height) = (div.offset_width() as f64, div.offset_height() as f64);
+                                            let aspect = width/height;
+                                            let new_width = aspect * (height+ev.movement_y() as f64);
+                                            set_width.set(new_width);
                                         }
                                     }
+                                    ev.prevent_default();
+                                };
+
+
+                                view! {
+                                    <div
+                                        class="absolute h-full w-[calc(100%-1em)] left-2 top-2 bg-transparent cursor-ns-resize"
+                                        on:mousedown=p_down
+                                        on:mouseup=p_up
+                                        on:mouseleave=p_move
+                                        on:mouseout=p_move
+                                        on:mousecancel=p_up
+
+                                        on:mousemove=p_move
+                                    />
                                 }
-                            </For>
+                            }
+                            <div
+                                class="cursor-grab"
+
+                                on:pointerdown=pointer_down
+                                on:pointermove=pointer_move
+
+                                on:pointerup=pointer_up
+                                on:pointercancel=pointer_up
+                                on:pointerout=pointer_up
+                                on:pointerleave=pointer_up
+                            >
+                                <For
+                                    each=move||{
+                                        let users = video_users.get().keys().cloned().collect::<Vec<_>>();
+                                        users
+                                    }
+                                    key=|id|*id
+                                    let:user_id
+                                >
+                                    {
+                                        let user = create_memo(move |_| video_users.get_untracked().get(&user_id).cloned());
+                                        move ||{
+                                            if let Some(user) = user.get() {
+                                                let video_ref= user.video_ref;
+                                                let is_video_active = user.is_video_active;
+                                                view! {
+                                                    <video ref={video_ref}
+                                                        class="w-full -scale-x-100"
+                                                        class=("hidden", move || !is_video_active.get())
+                                                    />
+                                                }.into_view()
+                                            }else{
+                                                view! {}.into_view()
+                                            }
+                                        }
+                                    }
+                                </For>
+                            </div>
+
                         </div>
                     </Portal>
                 }.into_view()
