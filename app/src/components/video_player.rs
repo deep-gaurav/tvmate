@@ -6,6 +6,7 @@ use leptos_use::{
 use logging::warn;
 use tracing::info;
 use wasm_bindgen::JsCast;
+use web_sys::MediaStream;
 
 use crate::{
     components::toaster::{Toast, Toaster},
@@ -40,8 +41,14 @@ impl std::fmt::Display for VideoState {
     }
 }
 
+#[derive(Clone)]
+pub enum VideoSource {
+    Url(String),
+    Stream(MediaStream),
+}
+
 #[component]
-pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
+pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoView {
     let video_node = create_node_ref::<leptos::html::Video>();
 
     let (video_state, set_video_state) = create_signal(VideoState::Waiting);
@@ -195,6 +202,14 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
 
     let (chat_msg, set_chat_msg) = create_signal(String::new());
 
+    create_effect(move |_| {
+        if let Some(VideoSource::Stream(stream)) = src.get() {
+            if let Some(video_node) = video_node.get_untracked() {
+                video_node.set_src_object(Some(&stream));
+            }
+        }
+    });
+
     view! {
         <div
             class="h-full w-full flex flex-col"
@@ -255,7 +270,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                     }
                 >
                     {move || {
-                        if let Some(url) = src.get() {
+                        if let Some(VideoSource::Url(url)) = src.get() {
                             view! { <source src=url /> }.into_view()
                         } else {
                             view! {}.into_view()
@@ -350,14 +365,24 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<String>>) -> impl IntoView {
                                 VideoState::Playing => {
                                     if let Some(video) = video_node.get_untracked() {
                                         if let Err(err) = video.pause() {
-                                            warn!("Errored Playing {err:#?}");
+                                            warn!("Errored Pausing {err:#?}");
                                         }
                                     }
                                 }
                                 VideoState::Paused | VideoState::Waiting => {
                                     if let Some(video) = video_node.get_untracked() {
                                         if let Err(err) = video.play() {
-                                            warn!("Errored Pausing {err:#?}");
+                                            warn!("Errored Playing {err:#?}");
+                                        }else{
+                                            let rm = expect_context::<RoomManager>();
+                                            info!("Sharevideo");
+                                            leptos::spawn_local(async move {
+                                                info!("add share video call");
+
+                                                if let Err(err) = rm.add_video_share(video_node).await {
+                                                    warn!("Add video share error {err:?}");
+                                                }
+                                            });
                                         }
                                     }
                                 }

@@ -1,2 +1,5 @@
 [build]
 rustflags = ["-Z", "threads=12"]
+
+[env]
+RUSTFLAGS = "--cfg=web_sys_unstable_apis"

@@ -58,6 +58,15 @@ pub fn RoomPage() -> impl IntoView {
         },
     );
 
+    let video_stream_signal = room_manager.share_video_signal;
+    create_effect(move |_| {
+        if let (Some(video), _) = video_stream_signal.get() {
+            set_video_url.set(Some(crate::components::video_player::VideoSource::Stream(
+                video,
+            )));
+        }
+    });
+
     view! {
         <JoinDialog
             is_open=join_dialog_open
@@ -154,7 +163,7 @@ pub fn RoomPage() -> impl IntoView {
                                             info!("Video URL {url:#?}");
                                             if let Ok(url) = url {
                                                 set_video_name.set(Some(file.name()));
-                                                set_video_url.set(Some(url));
+                                                set_video_url.set(Some(crate::components::video_player::VideoSource::Url(url)));
                                             }
                                         }
                                     }

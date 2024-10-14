@@ -108,6 +108,8 @@ features = [
     "TouchList",
 
     "ShareData",
+
+    "HtmlMediaElement",
 ]
 
 # See https://github.com/akesson/cargo-leptos for documentation of all the parameters.

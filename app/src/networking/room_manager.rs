@@ -9,9 +9,9 @@ use common::{
 };
 use leptos::{
     create_effect, create_rw_signal, create_signal, expect_context, logging::warn, store_value,
-    with_owner, Callback, Owner, ReadSignal, RwSignal, Signal, SignalGet, SignalGetUntracked,
-    SignalSet, SignalSetUntracked, SignalUpdate, SignalWith, SignalWithUntracked, StoredValue,
-    WriteSignal,
+    with_owner, Callback, NodeRef, Owner, ReadSignal, RwSignal, Signal, SignalGet,
+    SignalGetUntracked, SignalSet, SignalSetUntracked, SignalUpdate, SignalWith,
+    SignalWithUntracked, StoredValue, WriteSignal,
 };
 use leptos_router::use_navigate;
 use leptos_use::{
@@ -28,7 +28,9 @@ use crate::{
     Endpoint,
 };
 
-use super::rtc_connect::{connect_to_user, get_media_stream, receive_peer_connections};
+use super::rtc_connect::{
+    add_video_share_track, connect_to_user, get_media_stream, receive_peer_connections,
+};
 
 #[derive(Clone)]
 pub struct RoomManager {
@@ -68,6 +70,9 @@ pub struct RoomManager {
 
     pub permission_request_signal: Signal<Option<(Uuid, bool, bool)>>,
     permission_request_sender: WriteSignal<Option<(Uuid, bool, bool)>>,
+
+    pub share_video_signal: Signal<(Option<MediaStream>, Option<MediaStream>)>,
+    share_video_writer: WriteSignal<(Option<MediaStream>, Option<MediaStream>)>,
     owner: Owner,
 }
 
@@ -187,6 +192,8 @@ impl RoomManager {
         let self_video = create_rw_signal(Option::<MediaStreamTrack>::None);
         let self_audio = create_rw_signal(None);
 
+        let (share_video_rx, share_video_tx) = create_signal((None, None));
+
         create_effect(move |_| {
             if let Some(vdo) = self_video.get() {
                 info!("added self vdo id {}", vdo.id());
@@ -208,6 +215,8 @@ impl RoomManager {
             rtc_signal: rtc_rtx,
             self_audio,
             self_video,
+            share_video_signal: share_video_rx.into(),
+            share_video_writer: share_video_tx,
         };
         with_owner(owner, {
             let rm = rm.clone();
@@ -249,6 +258,7 @@ impl RoomManager {
                     Callback::new(move |(user, stream)| {
                         audio_tx.set(Some((user, stream)));
                     }),
+                    share_video_tx,
                     {
                         let rm = rm.clone();
                         Callback::new(move |(user, ice)| {
@@ -855,6 +865,7 @@ impl RoomManager {
             let rtc_setter = self.rtc_signal;
             let self_video = self.self_video;
             let self_audio = self.self_audio;
+            let share_setter = self.share_video_writer;
             info!("Connect to user {user} self_id {}", room_info.user_id);
             let pc = if let Some(pc) = self
                 .rtc_signal
@@ -881,6 +892,7 @@ impl RoomManager {
                 Callback::new(move |(id, media)| {
                     audio_setter.set(Some((id, media)));
                 }),
+                share_setter,
                 Callback::new(move |(id, pc)| {
                     rtc_setter.update(|peers| {
                         if let Some(pc) = pc {
@@ -932,6 +944,27 @@ impl RoomManager {
         } else {
             Err(JsValue::from_str("Room not connected"))
         }
+    }
+
+    pub async fn add_video_share(
+        &self,
+        video: NodeRef<leptos::html::Video>,
+    ) -> Result<(), JsValue> {
+        info!("Try send video share");
+        let pc = self
+            .rtc_signal
+            .with_untracked(|p| p.iter().next().map(|p| (*p.0, p.1.clone())));
+        if let Some((u, pc)) = pc {
+            let new_offer = add_video_share_track(&pc, video).await?;
+            info!("New offer {new_offer:?}");
+            self.send_message(
+                ClientMessage::SendSessionDesc(u, new_offer),
+                SendType::Reliable,
+            );
+        } else {
+            warn!("No pc")
+        }
+        Ok(())
     }
 
     pub fn close_vc(&self, user: Uuid) -> Result<(), JsValue> {

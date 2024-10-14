@@ -68,7 +68,7 @@ pub fn ToasterWrapper(children: Children) -> impl IntoView {
 
                     let UseTimeoutFnReturn{start,..}= use_timeout_fn(move|_:()|{
                         request_animation_frame(move||{
-                            animated_in.set(true);
+                            animated_in.try_set(true);
                         });
                     }, 0.0);
                     start(());

@@ -66,8 +66,15 @@ pub struct RtcConfig {
     pub turn_creds: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum OfferReason {
+    VideoCall,
+    VideoShare(Vec<String>),
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RTCSessionDesc {
     pub typ: String,
     pub sdp: String,
+    pub reason: OfferReason,
 }
