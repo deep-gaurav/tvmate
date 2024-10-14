@@ -40,32 +40,34 @@ pub fn VideoChat() -> impl IntoView {
     let room_info = rm.get_room_info();
     let owner = Owner::current().unwrap();
 
+    let users = create_memo(move |_| {
+        room_info
+            .with(|r| r.as_ref().map(|r| r.users.clone()))
+            .unwrap_or_default()
+    });
+
     create_effect(move |_| {
-        if let Some(room_info) = room_info.get() {
-            let vu = video_users.get_untracked();
-            let mut new_users = HashMap::new();
-            for user in room_info.users {
-                if let Some(user_v) = vu.get(&user.id) {
-                    let user_id = user.id;
-                    user_v.user_meta.set(user);
-                    new_users.insert(user_id, user_v.clone());
-                } else {
-                    new_users.insert(
-                        user.id,
-                        VideoUser {
-                            user_meta: with_owner(owner, || create_rw_signal(user)),
-                            video_ref: with_owner(owner, || create_node_ref()),
-                            is_video_active: with_owner(owner, || create_rw_signal(false)),
-                        },
-                    );
-                }
+        let users = users.get();
+        set_video_users.update(|video_user| {
+            video_user.retain(|&k, _| users.iter().any(|u| u.id == k));
+
+            for user in users {
+                video_user.entry(user.id).or_insert(VideoUser {
+                    user_meta: with_owner(owner, || create_rw_signal(user)),
+                    video_ref: with_owner(owner, || create_node_ref()),
+                    is_video_active: with_owner(owner, || create_rw_signal(false)),
+                });
             }
-            set_video_users.set(new_users);
-        }
+        });
     });
 
     let video_receiver = rm.video_chat_stream_signal.0;
 
+    create_effect(move |_| {
+        if let Some((user_id, stream)) = video_receiver.get() {
+            info!("Track Rebuild");
+        }
+    });
     create_effect(move |_| {
         if let Some((user_id, stream)) = video_receiver.get() {
             if let Some(VideoUser {

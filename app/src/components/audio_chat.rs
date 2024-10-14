@@ -33,6 +33,7 @@ pub fn AudioChat() -> impl IntoView {
             }
         }
     });
+    let user_ids = create_memo(move |_| users.get().into_iter().map(|u| u.id).collect::<Vec<_>>());
 
     let acs = store_value(HashMap::new());
 
@@ -142,9 +143,9 @@ pub fn AudioChat() -> impl IntoView {
     });
 
     create_effect(move |_| {
-        for user in users.get() {
+        for user in user_ids.get() {
             audio_tag_ref.update(move |tag_map| {
-                tag_map.entry(user.id).or_insert(with_owner(owner, || {
+                tag_map.entry(user).or_insert(with_owner(owner, || {
                     create_node_ref::<leptos::html::Audio>()
                 }));
             });

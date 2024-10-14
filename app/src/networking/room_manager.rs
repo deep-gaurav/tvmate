@@ -71,8 +71,11 @@ pub struct RoomManager {
     pub permission_request_signal: Signal<Option<(Uuid, bool, bool)>>,
     permission_request_sender: WriteSignal<Option<(Uuid, bool, bool)>>,
 
-    pub share_video_signal: Signal<(Option<MediaStream>, Option<MediaStream>)>,
-    share_video_writer: WriteSignal<(Option<MediaStream>, Option<MediaStream>)>,
+    pub share_video_signal: Signal<(Option<MediaStreamTrack>, Option<MediaStreamTrack>)>,
+    share_video_writer: WriteSignal<(Option<MediaStreamTrack>, Option<MediaStreamTrack>)>,
+
+    pub share_video_permission: Signal<Option<Uuid>>,
+    share_video_permission_tx: WriteSignal<Option<Uuid>>,
     owner: Owner,
 }
 
@@ -194,6 +197,8 @@ impl RoomManager {
 
         let (share_video_rx, share_video_tx) = create_signal((None, None));
 
+        let share_video_sig = create_signal(None);
+
         create_effect(move |_| {
             if let Some(vdo) = self_video.get() {
                 info!("added self vdo id {}", vdo.id());
@@ -217,6 +222,8 @@ impl RoomManager {
             self_video,
             share_video_signal: share_video_rx.into(),
             share_video_writer: share_video_tx,
+            share_video_permission: share_video_sig.0.into(),
+            share_video_permission_tx: share_video_sig.1,
         };
         with_owner(owner, {
             let rm = rm.clone();
@@ -467,6 +474,7 @@ impl RoomManager {
                     let sdp_setter = self.sdp_signal.1;
 
                     let permission_request_notifier = self.permission_request_sender;
+                    let share_permission_tx = self.share_video_permission_tx;
 
                     create_effect(move |_| {
                         let message = message.get();
@@ -656,6 +664,9 @@ impl RoomManager {
                                         info!("Receivedd vc request");
                                         permission_request_notifier
                                             .set(Some((from_user, video, audio)));
+                                    }
+                                    ClientMessage::RequestVideoShare(_) => {
+                                        share_permission_tx.set(Some(from_user));
                                     }
                                 },
                             }
@@ -867,14 +878,9 @@ impl RoomManager {
             let self_audio = self.self_audio;
             let share_setter = self.share_video_writer;
             info!("Connect to user {user} self_id {}", room_info.user_id);
-            let pc = if let Some(pc) = self
+            let pc = self
                 .rtc_signal
-                .with_untracked(|peers| peers.get(&user).cloned())
-            {
-                Some(pc)
-            } else {
-                None
-            };
+                .with_untracked(|peers| peers.get(&user).cloned());
             let rm = self.clone();
             connect_to_user(
                 pc,
@@ -948,17 +954,16 @@ impl RoomManager {
 
     pub async fn add_video_share(
         &self,
+        user: Uuid,
         video: NodeRef<leptos::html::Video>,
     ) -> Result<(), JsValue> {
         info!("Try send video share");
-        let pc = self
-            .rtc_signal
-            .with_untracked(|p| p.iter().next().map(|p| (*p.0, p.1.clone())));
-        if let Some((u, pc)) = pc {
+        let pc = self.rtc_signal.with_untracked(|p| p.get(&user).cloned());
+        if let Some(pc) = pc {
             let new_offer = add_video_share_track(&pc, video).await?;
             info!("New offer {new_offer:?}");
             self.send_message(
-                ClientMessage::SendSessionDesc(u, new_offer),
+                ClientMessage::SendSessionDesc(user, new_offer),
                 SendType::Reliable,
             );
         } else {

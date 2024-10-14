@@ -22,6 +22,8 @@ pub enum ClientMessage {
     ReceivedSessionDesc(RTCSessionDesc),
     ExchangeCandidate(Uuid, String),
     RequestCall(Uuid, bool, bool),
+
+    RequestVideoShare(Uuid),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

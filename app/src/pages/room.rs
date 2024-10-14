@@ -3,6 +3,7 @@ use leptos_meta::{Meta, Title};
 use leptos_router::*;
 use tracing::info;
 use wasm_bindgen::{JsCast, UnwrapThrowExt};
+use web_sys::MediaStream;
 
 use crate::{
     apis::get_room_info,
@@ -60,10 +61,32 @@ pub fn RoomPage() -> impl IntoView {
 
     let video_stream_signal = room_manager.share_video_signal;
     create_effect(move |_| {
-        if let (Some(video), _) = video_stream_signal.get() {
-            set_video_url.set(Some(crate::components::video_player::VideoSource::Stream(
-                video,
-            )));
+        let stream = MediaStream::new();
+        if let Ok(stream) = stream {
+            let (video, audio) = video_stream_signal.get();
+            if let Some(video) = &video {
+                stream.add_track(video);
+            }
+            if let Some(audio) = &audio {
+                stream.add_track(audio);
+            }
+            if video.is_some() || audio.is_some() {
+                set_video_url.set(Some(crate::components::video_player::VideoSource::Stream(
+                    stream,
+                )))
+            }
+        }
+    });
+
+    let selected_users = create_memo(move |_| {
+        if let Some(room_info) = room_info.get() {
+            let mut users = room_info.users;
+            users.retain(|u| {
+                u.id != room_info.user_id && matches!(u.state, common::UserState::VideoSelected(_))
+            });
+            users
+        } else {
+            vec![]
         }
     });
 
@@ -168,6 +191,33 @@ pub fn RoomPage() -> impl IntoView {
                                         }
                                     }
                                 />
+                            </div>
+
+
+                            <div
+                                class="h-4"
+                                class=("hidden", move||selected_users.with(|users|users.is_empty()))
+                            >"Or"</div>
+
+
+                            <div
+                                class="h-full w-full my-8 p-4 flex flex-col items-center justify-center border-white border-solid border-2 rounded-sm"
+                                class=("hidden", move||selected_users.with(|users|users.is_empty()))
+                            >
+                                <For
+                                    each=move||selected_users.get()
+                                    key=|user|user.id
+                                    let:user
+                                >
+                                    <button class="px-1 hover:bg-slate-700 active:bg-slate-900"
+                                        on:click=move|_|{
+                                            let rm = expect_context::<RoomManager>();
+                                            rm.send_message(common::message::ClientMessage::RequestVideoShare(user.id), crate::networking::room_manager::SendType::Reliable);
+                                        }
+                                    >
+                                        "[ Join " {user.name} "'s Video ]"
+                                    </button>
+                                </For>
                             </div>
                         </div>
                     }

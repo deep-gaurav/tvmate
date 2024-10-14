@@ -212,6 +212,16 @@ async fn handle_websocket(
                                                                         }
                                                                     }
                                                                 },
+                                                                common::message::ClientMessage::RequestVideoShare(uuid) => {
+                                                                    let sender = app_state.rooms.with_room(room_id, |room| {
+                                                                        room.users.iter().find(|user|user.meta.id == *uuid).map(|user| user.sender.clone())
+                                                                    }).await.flatten();
+                                                                    if let Some(sender) = sender {
+                                                                        if let Err(err) = sender.send(Message::ClientMessage((*sender_id, ClientMessage::RequestVideoShare(*sender_id)))).await{
+                                                                            warn!("Failed send session desc {err:?}");
+                                                                        }
+                                                                    }
+                                                                },
                                                                 common::message::ClientMessage::RequestCall(uuid, video,audio) => 'b:{
                                                                     if let Some((Some(last_send), sender)) = app_state.rooms.with_room(room_id,|room|{
                                                                         room.users.iter().find(|user|user.meta.id == *sender_id).map(|u|(u.last_chat_request, u.sender.clone()))

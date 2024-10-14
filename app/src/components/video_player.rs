@@ -75,6 +75,22 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
 
     let (is_full_screen, set_is_full_screen) = create_signal(false);
 
+    let share_permission_sig = room_manager.share_video_permission;
+    create_effect({
+        let room_manager = room_manager.clone();
+
+        move |_| {
+            if let Some(share_user) = share_permission_sig.get() {
+                let room_manager = room_manager.clone();
+                leptos::spawn_local(async move {
+                    if let Err(err) = room_manager.add_video_share(share_user, video_node).await {
+                        warn!("Add video share error {err:?}");
+                    }
+                });
+            }
+        }
+    });
+
     create_effect(move |_| {
         if let Some(video) = video_node.get() {
             if let Some(message) = player_messages_receiver.get() {
@@ -373,16 +389,6 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                                     if let Some(video) = video_node.get_untracked() {
                                         if let Err(err) = video.play() {
                                             warn!("Errored Playing {err:#?}");
-                                        }else{
-                                            let rm = expect_context::<RoomManager>();
-                                            info!("Sharevideo");
-                                            leptos::spawn_local(async move {
-                                                info!("add share video call");
-
-                                                if let Err(err) = rm.add_video_share(video_node).await {
-                                                    warn!("Add video share error {err:?}");
-                                                }
-                                            });
                                         }
                                     }
                                 }

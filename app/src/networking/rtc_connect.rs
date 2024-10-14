@@ -101,7 +101,7 @@ pub async fn connect_to_user<F>(
 
     video_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
     audio_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
-    video_share_setter: WriteSignal<(Option<MediaStream>, Option<MediaStream>)>,
+    video_share_setter: WriteSignal<(Option<MediaStreamTrack>, Option<MediaStreamTrack>)>,
 
     rtc_setter: Callback<(Uuid, Option<RtcPeerConnection>), ()>,
 
@@ -145,7 +145,7 @@ where
                             if video_track_ids.contains(&track.id()) {
                                 video_share_setter.update(|(video, audio)| {
                                     info!("Add shared audio");
-                                    *audio = Some(stream);
+                                    *audio = Some(track);
                                 });
                             } else {
                                 audio_media_setter.call((user, Some(stream)));
@@ -156,7 +156,7 @@ where
                             if video_track_ids.contains(&track.id()) {
                                 video_share_setter.update(|(video, audio)| {
                                     info!("Add shared video");
-                                    *video = Some(stream);
+                                    *video = Some(track);
                                 });
                             } else {
                                 video_media_setter.call((user, Some(stream)));
@@ -411,7 +411,7 @@ pub fn receive_peer_connections<F>(
     video_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
     audio_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
 
-    video_share_setter: WriteSignal<(Option<MediaStream>, Option<MediaStream>)>,
+    video_share_setter: WriteSignal<(Option<MediaStreamTrack>, Option<MediaStreamTrack>)>,
 
     ice_callback: Callback<(Uuid, String)>,
     session_callback: Callback<(Uuid, RTCSessionDesc)>,
@@ -584,7 +584,7 @@ pub fn receive_peer_connections<F>(
                                         {
                                             if video_track_ids.contains(&track.id()) {
                                                 video_share_setter.update(|(video, audio)| {
-                                                    *audio = Some(stream);
+                                                    *audio = Some(track);
                                                 });
                                             } else {
                                                 audio_media_setter.call((from_user, Some(stream)));
@@ -594,7 +594,7 @@ pub fn receive_peer_connections<F>(
                                         {
                                             if video_track_ids.contains(&track.id()) {
                                                 video_share_setter.update(|(video, audio)| {
-                                                    *video = Some(stream);
+                                                    *video = Some(track);
                                                 });
                                             } else {
                                                 video_media_setter.call((from_user, Some(stream)));
