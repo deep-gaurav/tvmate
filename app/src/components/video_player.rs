@@ -47,6 +47,14 @@ pub enum VideoSource {
     Stream(MediaStream),
 }
 
+#[derive(Clone, PartialEq)]
+pub enum VideoType {
+    None,
+    Local,
+    LocalStreamingOut,
+    RemoteStreamingIn,
+}
+
 #[component]
 pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoView {
     let video_node = create_node_ref::<leptos::html::Video>();
@@ -76,6 +84,8 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
     let (is_full_screen, set_is_full_screen) = create_signal(false);
 
     let share_permission_sig = room_manager.share_video_permission;
+
+    let video_type = store_value(VideoType::None);
     create_effect({
         let room_manager = room_manager.clone();
 
@@ -85,8 +95,23 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                 leptos::spawn_local(async move {
                     if let Err(err) = room_manager.add_video_share(share_user, video_node).await {
                         warn!("Add video share error {err:?}");
+                    } else {
+                        video_type.set_value(VideoType::LocalStreamingOut);
                     }
                 });
+            }
+        }
+    });
+
+    create_effect(move |_| {
+        if let Some(video_source_type) = src.get() {
+            match video_source_type {
+                VideoSource::Url(_) => {
+                    video_type.set_value(VideoType::Local);
+                }
+                VideoSource::Stream(_) => {
+                    video_type.set_value(VideoType::RemoteStreamingIn);
+                }
             }
         }
     });
@@ -127,7 +152,9 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                         }
                         crate::networking::room_manager::PlayerMessages::Update(_) => {}
                         crate::networking::room_manager::PlayerMessages::Seek(time) => {
-                            video.set_current_time(*time);
+                            if VideoType::Local == video_type.get_value() {
+                                video.set_current_time(*time);
+                            }
                         }
                     }
 
@@ -139,7 +166,9 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                             if let Some(current_time) = current_time.get_untracked() {
                                 if ((current_time - time) as f64).abs() > 15.0 {
                                     info!("Time difference big, seeking to time");
-                                    video.set_current_time(time);
+                                    if VideoType::Local == video_type.get_value() {
+                                        video.set_current_time(time);
+                                    }
                                 }
                             }
                         }
