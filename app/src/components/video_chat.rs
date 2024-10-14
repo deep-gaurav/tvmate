@@ -373,15 +373,17 @@ pub fn VideoChatManager(
         }
     });
 
-    let rtc_getter = rm.rtc_signal.0;
+    let rtc_getter = rm.rtc_signal;
     create_effect(move |_| {
-        if let Some((user, pc)) = rtc_getter.get() {
-            let mut vu = video_users.get_untracked();
-            if let Some(entry) = vu.get_mut(&user) {
-                entry.connection.set(pc);
+        rtc_getter.with(|peers| {
+            for (id, vu) in video_users.get_untracked() {
+                if let Some(pc) = peers.get(&id) {
+                    vu.connection.set(Some(pc.clone()));
+                } else {
+                    vu.connection.set(None);
+                }
             }
-            set_video_users.set(vu);
-        }
+        });
     });
 
     view! {

@@ -2,7 +2,8 @@ use std::{collections::HashMap, future::Future};
 
 use common::message::{RTCSessionDesc, RtcConfig};
 use leptos::{
-    create_effect, store_value, with_owner, Callable, Callback, Owner, Signal, SignalGet,
+    create_effect, store_value, with_owner, Callable, Callback, Owner, RwSignal, Signal, SignalGet,
+    SignalUpdate, SignalUpdateUntracked, SignalWithUntracked,
 };
 use leptos_use::use_event_listener;
 use tracing::{info, warn};
@@ -88,6 +89,7 @@ pub async fn add_media_tracks(
 
 #[allow(clippy::too_many_arguments)]
 pub async fn connect_to_user<F>(
+    pc: Option<RtcPeerConnection>,
     self_id: Uuid,
     user: Uuid,
     rtc_config: &RtcConfig,
@@ -112,7 +114,11 @@ where
     F: Future<Output = (Option<MediaStreamTrack>, Option<MediaStreamTrack>)> + 'static,
 {
     info!("Host user");
-    let pc = connect_rtc(rtc_config)?;
+    let pc = if let Some(pc) = pc {
+        pc
+    } else {
+        connect_rtc(rtc_config)?
+    };
 
     let is_closed = store_value(false);
     let pending_ice = store_value(Some(vec![]));
@@ -298,6 +304,7 @@ where
 #[allow(clippy::too_many_arguments)]
 pub fn receive_peer_connections<F>(
     self_id: Callback<(), Option<Uuid>>,
+    peers: RwSignal<HashMap<Uuid, RtcPeerConnection>>,
     rtc_config: Callback<(), Option<RtcConfig>>,
 
     permissions_callback: Callback<Uuid, (bool, bool)>,
@@ -305,7 +312,6 @@ pub fn receive_peer_connections<F>(
 
     video_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
     audio_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
-    rtc_setter: Callback<(Uuid, Option<RtcPeerConnection>), ()>,
 
     ice_callback: Callback<(Uuid, String)>,
     session_callback: Callback<(Uuid, RTCSessionDesc)>,
@@ -319,13 +325,12 @@ pub fn receive_peer_connections<F>(
 ) where
     F: Future<Output = (Option<MediaStreamTrack>, Option<MediaStreamTrack>)> + 'static,
 {
-    let peers = store_value(HashMap::<Uuid, RtcPeerConnection>::new());
     let pending_candidates = store_value(HashMap::<Uuid, Vec<RtcIceCandidateInit>>::new());
 
     create_effect(move |_| {
         if let Some((from_user, candidate)) = ice_signal.get() {
             if let Ok(candidate) = deserialize_candidate(&candidate) {
-                if let Some(pc) = peers.with_value(|peers| peers.get(&from_user).cloned()) {
+                if let Some(pc) = peers.with_untracked(|peers| peers.get(&from_user).cloned()) {
                     info!("add ice to pc");
                     let _ = pc.add_ice_candidate_with_opt_rtc_ice_candidate_init(Some(&candidate));
                 } else {
@@ -342,6 +347,12 @@ pub fn receive_peer_connections<F>(
 
     create_effect(move |_| {
         if let Some((from_user, rtcsession_desc)) = session_signal.get() {
+            if let Some(RtcPeerConnectionState::Connected | RtcPeerConnectionState::Connecting) =
+                peers.with_untracked(|pc| pc.get(&from_user).map(|p| p.connection_state()))
+            {
+                warn!("Peer already connected ignoring");
+                return;
+            }
             info!("Got sdp from {from_user} starting connection");
             let Ok(offer_type) =
                 RtcSdpType::from_js_value(&JsValue::from_str(&rtcsession_desc.typ))
@@ -387,12 +398,11 @@ pub fn receive_peer_connections<F>(
                                 match connection {
                                     RtcPeerConnectionState::Closed
                                     | RtcPeerConnectionState::Disconnected => {
-                                        peers.update_value(|p| {
+                                        peers.update(|p| {
                                             info!("disconnected, remove pc");
                                             p.remove(&from_user);
                                         });
 
-                                        rtc_setter.call((from_user, None));
                                         video_media_setter.call((from_user, None));
                                         audio_media_setter.call((from_user, None));
                                         video_media_setter.call((self_id, None));
@@ -401,9 +411,7 @@ pub fn receive_peer_connections<F>(
                                         pc.close();
                                         close_self.call(());
                                     }
-                                    RtcPeerConnectionState::Connected => {
-                                        rtc_setter.call((from_user, Some(pc.clone())));
-                                    }
+                                    RtcPeerConnectionState::Connected => {}
                                     _ => {}
                                 }
                             }
@@ -475,7 +483,7 @@ pub fn receive_peer_connections<F>(
                             );
                         });
 
-                        peers.update_value(|p| {
+                        peers.update(|p| {
                             p.insert(from_user, pc);
                         });
                         session_callback.call((from_user, answer));

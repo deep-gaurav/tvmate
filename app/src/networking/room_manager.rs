@@ -21,7 +21,7 @@ use thiserror::Error;
 use tracing::info;
 use uuid::Uuid;
 use wasm_bindgen::{JsCast, JsValue};
-use web_sys::{MediaStream, MediaStreamTrack, RtcIceCandidateInit, RtcPeerConnection, WebSocket};
+use web_sys::{MediaStream, MediaStreamTrack, RtcPeerConnection, WebSocket};
 
 use crate::{
     components::toaster::{Toast, Toaster},
@@ -49,10 +49,8 @@ pub struct RoomManager {
         WriteSignal<Option<(Uuid, Option<MediaStream>)>>,
     ),
     #[allow(clippy::type_complexity)]
-    pub rtc_signal: (
-        ReadSignal<Option<(Uuid, Option<RtcPeerConnection>)>>,
-        WriteSignal<Option<(Uuid, Option<RtcPeerConnection>)>>,
-    ),
+    pub rtc_signal: RwSignal<HashMap<Uuid, RtcPeerConnection>>,
+
     #[allow(clippy::type_complexity)]
     pub ice_signal: (
         ReadSignal<Option<(Uuid, String)>>,
@@ -139,8 +137,6 @@ where
         WriteSignal<Option<(UserMeta, String)>>,
     ),
     pub rtc_config: StoredValue<RtcConfig>,
-    pub rtc_peers: StoredValue<HashMap<Uuid, RtcPeerConnection>>,
-    pub rtc_pending_ice: StoredValue<HashMap<Uuid, Vec<RtcIceCandidateInit>>>,
 }
 
 #[derive(Debug, Clone)]
@@ -183,7 +179,7 @@ impl RoomManager {
         let (session_description, session_description_tx) = create_signal(None);
         let (video_rx, video_tx) = with_owner(owner, || create_signal(None));
         let (audio_rx, audio_tx) = with_owner(owner, || create_signal(None));
-        let (rtc_rx, rtc_tx) = with_owner(owner, || create_signal(None));
+        let rtc_rtx = with_owner(owner, || create_rw_signal(HashMap::new()));
         let vc_permission = store_value(HashMap::new());
 
         let (permissions_rx, permissions_tx) = create_signal(None);
@@ -209,7 +205,7 @@ impl RoomManager {
             vc_permission,
             permission_request_sender: permissions_tx,
             permission_request_signal: permissions_rx.into(),
-            rtc_signal: (rtc_rx, rtc_tx),
+            rtc_signal: rtc_rtx,
             self_audio,
             self_video,
         };
@@ -223,6 +219,7 @@ impl RoomManager {
                             .0
                             .with_untracked(|room| room.as_ref().map(|r: &RoomInfo| r.user_id))
                     }),
+                    rtc_rtx,
                     {
                         let state = state.clone();
                         Callback::new(move |_| {
@@ -251,9 +248,6 @@ impl RoomManager {
                     }),
                     Callback::new(move |(user, stream)| {
                         audio_tx.set(Some((user, stream)));
-                    }),
-                    Callback::new(move |(user, pc)| {
-                        rtc_tx.set(Some((user, pc)));
                     }),
                     {
                         let rm = rm.clone();
@@ -502,21 +496,13 @@ impl RoomManager {
                                                 })
                                             });
 
-                                            let pcs =
-                                                with_owner(owner, || store_value(HashMap::new()));
-
-                                            let ice =
-                                                with_owner(owner, || store_value(HashMap::new()));
-
                                             let connection_info = RoomConnectionInfo {
                                                 connection: unsafe { std::ptr::read(connection) },
                                                 socket: *socket,
                                                 ready_state: unsafe { std::ptr::read(ready_state) },
                                                 chat_signal,
                                                 chat_history,
-                                                rtc_peers: pcs,
                                                 rtc_config,
-                                                rtc_pending_ice: ice,
                                             };
                                             drop(state_c_ref);
                                             let mut state = state_c.borrow_mut();
@@ -845,35 +831,42 @@ impl RoomManager {
         audio: bool,
     ) -> Result<(), JsValue> {
         info!("Connect host");
-        let rtc_config_peer = if let RoomState::Connected(RoomConnectionInfo {
-            rtc_config,
-
-            rtc_peers,
-            ..
-        }) = &*self.state.borrow()
-        {
-            Some((*rtc_config, *rtc_peers))
-        } else {
-            None
-        };
+        let rtc_config_peer =
+            if let RoomState::Connected(RoomConnectionInfo { rtc_config, .. }) =
+                &*self.state.borrow()
+            {
+                Some(*rtc_config)
+            } else {
+                None
+            };
 
         let Some(room_info) = self.get_room_info().get_untracked() else {
             return Err(JsValue::from_str("Room not connected"));
         };
 
-        if let Some((rtc_config, _rtc_peers)) = rtc_config_peer {
+        if let Some(rtc_config) = rtc_config_peer {
             let ice_signal = self.ice_signal.0;
             let session_signal = self.sdp_signal.0;
             let owner = self.owner;
 
             let video_setter = self.video_chat_stream_signal.1;
             let audio_setter = self.audio_chat_stream_signal.1;
-            let rtc_setter = self.rtc_signal.1;
+
+            let rtc_setter = self.rtc_signal;
             let self_video = self.self_video;
             let self_audio = self.self_audio;
             info!("Connect to user {user} self_id {}", room_info.user_id);
+            let pc = if let Some(pc) = self
+                .rtc_signal
+                .with_untracked(|peers| peers.get(&user).cloned())
+            {
+                Some(pc)
+            } else {
+                None
+            };
             let rm = self.clone();
             connect_to_user(
+                pc,
                 room_info.user_id,
                 user,
                 &rtc_config.get_value(),
@@ -889,7 +882,13 @@ impl RoomManager {
                     audio_setter.set(Some((id, media)));
                 }),
                 Callback::new(move |(id, pc)| {
-                    rtc_setter.set(Some((id, pc)));
+                    rtc_setter.update(|peers| {
+                        if let Some(pc) = pc {
+                            peers.insert(id, pc);
+                        } else {
+                            peers.remove(&id);
+                        }
+                    });
                 }),
                 {
                     let rm = rm.clone();
@@ -964,7 +963,9 @@ impl RoomManager {
             .1
             .set(Some((room_info.user_id, None)));
 
-        self.rtc_signal.1.set(Some((user, None)));
+        self.rtc_signal.update(|peers| {
+            peers.remove(&user);
+        });
 
         Ok(())
     }
