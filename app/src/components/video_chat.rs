@@ -65,11 +65,6 @@ pub fn VideoChat() -> impl IntoView {
 
     create_effect(move |_| {
         if let Some((user_id, stream)) = video_receiver.get() {
-            info!("Track Rebuild");
-        }
-    });
-    create_effect(move |_| {
-        if let Some((user_id, stream)) = video_receiver.get() {
             if let Some(VideoUser {
                 video_ref,
                 is_video_active,
@@ -447,7 +442,7 @@ pub fn VideoChatManager(
 
                                                             let rm = expect_context::<RoomManager>();
                                                             let toaster = expect_context::<Toaster>();
-                                                            if user.connection.get_untracked().is_none(){
+                                                            if user.connection.get_untracked().is_none() || (rm.self_audio.with_untracked(|r|r.is_none()) && rm.self_video.with_untracked(|r|r.is_none())){
                                                                 leptos::spawn_local(async move {
                                                                     if let Err(err) =  rm.send_vc_request(user.meta.get_untracked().id, true, true).await{
                                                                         warn!("Failed to send vc request {err:?}");
@@ -467,6 +462,7 @@ pub fn VideoChatManager(
                                                                     }
                                                                 });
                                                             }else{
+
                                                                 rm.self_video.update(|vdo|{
                                                                     if let Some(vdo) = vdo{
                                                                         info!("Enable {}", vdo.id());
@@ -491,7 +487,7 @@ pub fn VideoChatManager(
                                                         on:click=move|_|{
                                                             let rm = expect_context::<RoomManager>();
                                                             let toaster = expect_context::<Toaster>();
-                                                            if user.connection.get_untracked().is_none(){
+                                                            if user.connection.get_untracked().is_none() || (rm.self_audio.with_untracked(|r|r.is_none()) && rm.self_video.with_untracked(|r|r.is_none())) {
                                                                 leptos::spawn_local(async move {
                                                                     if let Err(err) =  rm.send_vc_request(user.meta.get_untracked().id, false, true).await{
                                                                         warn!("Failed to send vc request {err:?}");
@@ -619,7 +615,7 @@ pub fn VideoChatConsent() -> impl IntoView {
                                                 let rm = expect_context::<RoomManager>();
                                                 let toaster = expect_context::<Toaster>();
                                                 leptos::spawn_local(async move {
-                                                    let res = rm.connect_audio_chat(request.0.id, request.1, request.2).await;
+                                                    let res = rm.connect_audio_chat(request.0.id, None, request.1, request.2).await;
                                                     if let Err(err) = res {
                                                         toaster.toast(Toast{
                                                             message: format!("{err:?}").into(),

@@ -3,7 +3,9 @@ use std::{cell::RefCell, collections::HashMap, marker::PhantomData, rc::Rc};
 use codee::binary::BincodeSerdeCodec;
 use common::{
     endpoints,
-    message::{ClientMessage, Message, RTCSessionDesc, RtcConfig, UserJoined, UserLeft},
+    message::{
+        ClientMessage, Message, OfferReason, RTCSessionDesc, RtcConfig, UserJoined, UserLeft,
+    },
     params::{HostParams, JoinParams},
     PlayerStatus, UserMeta, UserState,
 };
@@ -76,6 +78,8 @@ pub struct RoomManager {
 
     pub share_video_permission: Signal<Option<Uuid>>,
     share_video_permission_tx: WriteSignal<Option<Uuid>>,
+
+    video_offer_type: StoredValue<OfferReason>,
     owner: Owner,
 }
 
@@ -205,6 +209,8 @@ impl RoomManager {
             }
         });
 
+        let video_offer = store_value(OfferReason::VideoCall);
+
         let rm = Self {
             state,
             room_info_signal,
@@ -224,6 +230,7 @@ impl RoomManager {
             share_video_writer: share_video_tx,
             share_video_permission: share_video_sig.0.into(),
             share_video_permission_tx: share_video_sig.1,
+            video_offer_type: video_offer,
         };
         with_owner(owner, {
             let rm = rm.clone();
@@ -266,6 +273,7 @@ impl RoomManager {
                         audio_tx.set(Some((user, stream)));
                     }),
                     share_video_tx,
+                    video_offer,
                     {
                         let rm = rm.clone();
                         Callback::new(move |(user, ice)| {
@@ -848,6 +856,7 @@ impl RoomManager {
     pub async fn connect_audio_chat(
         &self,
         user: Uuid,
+        video_share: Option<NodeRef<leptos::html::Video>>,
         video: bool,
         audio: bool,
     ) -> Result<(), JsValue> {
@@ -877,13 +886,20 @@ impl RoomManager {
             let self_video = self.self_video;
             let self_audio = self.self_audio;
             let share_setter = self.share_video_writer;
+            let video_offer = self.video_offer_type;
             info!("Connect to user {user} self_id {}", room_info.user_id);
             let pc = self
                 .rtc_signal
                 .with_untracked(|peers| peers.get(&user).cloned());
             let rm = self.clone();
+            if video_share.is_none() {
+                self.vc_permission.update_value(|perms| {
+                    perms.insert(user, (video, audio));
+                });
+            }
             connect_to_user(
                 pc,
+                video_share,
                 room_info.user_id,
                 user,
                 &rtc_config.get_value(),
@@ -899,6 +915,7 @@ impl RoomManager {
                     audio_setter.set(Some((id, media)));
                 }),
                 share_setter,
+                video_offer,
                 Callback::new(move |(id, pc)| {
                     rtc_setter.update(|peers| {
                         if let Some(pc) = pc {
@@ -959,16 +976,10 @@ impl RoomManager {
     ) -> Result<(), JsValue> {
         info!("Try send video share");
         let pc = self.rtc_signal.with_untracked(|p| p.get(&user).cloned());
-        if let Some(pc) = pc {
-            let new_offer = add_video_share_track(&pc, video).await?;
-            info!("New offer {new_offer:?}");
-            self.send_message(
-                ClientMessage::SendSessionDesc(user, new_offer),
-                SendType::Reliable,
-            );
-        } else {
-            warn!("No pc")
-        }
+
+        self.connect_audio_chat(user, Some(video), false, false)
+            .await?;
+
         Ok(())
     }
 
