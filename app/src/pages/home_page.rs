@@ -7,6 +7,7 @@ use wasm_bindgen::{JsCast, JsValue};
 use web_sys::js_sys;
 
 use crate::components::dialog::Dialog;
+use crate::components::help_dialog::HelpDialog;
 use crate::components::join_dialog::JoinDialog;
 use crate::components::toaster::{Toast, Toaster};
 use crate::networking::room_manager::RoomManager;
@@ -31,6 +32,7 @@ pub fn HomePage() -> impl IntoView {
     });
 
     view! {
+        <HelpDialog />
         <Dialog
             is_self_sized=false
             is_open=host_open

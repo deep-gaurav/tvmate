@@ -1,6 +1,7 @@
 pub mod audio_chat;
 pub mod chatbox;
 pub mod dialog;
+pub mod help_dialog;
 pub mod icons;
 pub mod join_dialog;
 pub mod portal;
