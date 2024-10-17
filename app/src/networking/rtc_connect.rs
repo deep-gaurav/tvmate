@@ -3,7 +3,7 @@ use std::{collections::HashMap, future::Future};
 use common::message::{OfferReason, RTCSessionDesc, RtcConfig};
 use leptos::{
     create_effect, store_value, with_owner, Callable, Callback, NodeRef, Owner, RwSignal, Signal,
-    SignalGet, SignalUpdate, SignalUpdateUntracked, SignalWithUntracked, StoredValue, WriteSignal,
+    SignalGet, SignalUpdate, SignalWithUntracked, StoredValue, WriteSignal,
 };
 use leptos_use::use_event_listener;
 use tracing::{info, warn};
@@ -120,7 +120,7 @@ async fn create_send_offer(
             .expect("sdp type not string"),
         sdp: offer.get_sdp().expect("No sdp"),
         reason: share_tracks
-            .map(|tracks| OfferReason::VideoShare(tracks))
+            .map(OfferReason::VideoShare)
             .unwrap_or(common::message::OfferReason::VideoCall),
     })
 }
@@ -357,25 +357,20 @@ where
 
     with_owner(owner, || {
         if !is_connected {
-            create_effect({
-                let pc = pc.clone();
-                move |_| {
-                    if is_closed.get_value() {
-                        return;
-                    }
-                    if let Some((_, rtcsession_desc)) = session_signal.get() {
-                        if let OfferReason::VideoShare(mut track_ids) =
-                            rtcsession_desc.reason.clone()
-                        {
-                            info!("video share offer {track_ids:?}");
-                            video_tracks.update_value(|tracks| {
-                                if let Some(tracks) = tracks.get_mut(&user) {
-                                    tracks.append(&mut track_ids);
-                                } else {
-                                    tracks.insert(user, track_ids);
-                                }
-                            });
-                        }
+            create_effect(move |_| {
+                if is_closed.get_value() {
+                    return;
+                }
+                if let Some((_, rtcsession_desc)) = session_signal.get() {
+                    if let OfferReason::VideoShare(mut track_ids) = rtcsession_desc.reason.clone() {
+                        info!("video share offer {track_ids:?}");
+                        video_tracks.update_value(|tracks| {
+                            if let Some(tracks) = tracks.get_mut(&user) {
+                                tracks.append(&mut track_ids);
+                            } else {
+                                tracks.insert(user, track_ids);
+                            }
+                        });
                     }
                 }
             });

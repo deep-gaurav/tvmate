@@ -30,9 +30,7 @@ use crate::{
     Endpoint,
 };
 
-use super::rtc_connect::{
-    add_video_share_track, connect_to_user, get_media_stream, receive_peer_connections,
-};
+use super::rtc_connect::{connect_to_user, get_media_stream, receive_peer_connections};
 
 #[derive(Clone)]
 pub struct RoomManager {
@@ -975,7 +973,6 @@ impl RoomManager {
         video: NodeRef<leptos::html::Video>,
     ) -> Result<(), JsValue> {
         info!("Try send video share");
-        let pc = self.rtc_signal.with_untracked(|p| p.get(&user).cloned());
 
         self.connect_audio_chat(user, Some(video), false, false)
             .await?;

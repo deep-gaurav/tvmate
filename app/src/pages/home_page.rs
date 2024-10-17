@@ -2,7 +2,6 @@ use ev::Event;
 use leptos::component;
 use leptos::*;
 use leptos_use::use_event_listener;
-use logging::warn;
 use tracing::info;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::js_sys;
