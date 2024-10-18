@@ -522,20 +522,24 @@ pub fn VideoChatManager(
                                                     </button>
 
                                                     {
-                                                        move || if let Some(pc) = user.connection.get(){
-                                                            view! {
-                                                                <button class="flex flex-row hover:bg-white/20 px-4 py-1 gap-2 items-center text-red-500"
-                                                                    on:click=move|_|{
-                                                                        let rm = expect_context::<RoomManager>();
-                                                                        let _= rm.close_vc(user.meta.get().id);
-                                                                        pc.close();
-                                                                    }
-                                                                >
-                                                                    "[ "
-                                                                    <Icon class="w-8" icon=crate::components::icons::Icons::CallEnd />
-                                                                    " End Call ]"
-                                                                </button>
-                                                            }.into_view()
+                                                        move || if let Some(pc) = user.connection.get()  {
+                                                            if rm.self_audio.with_untracked(|r|r.is_some()) || rm.self_video.with_untracked(|r|r.is_some()) {
+                                                                view! {
+                                                                    <button class="flex flex-row hover:bg-white/20 px-4 py-1 gap-2 items-center text-red-500"
+                                                                        on:click=move|_|{
+                                                                            let rm = expect_context::<RoomManager>();
+                                                                            let _= rm.close_vc(user.meta.get().id);
+                                                                            pc.close();
+                                                                        }
+                                                                    >
+                                                                        "[ "
+                                                                        <Icon class="w-8" icon=crate::components::icons::Icons::CallEnd />
+                                                                        " End Call ]"
+                                                                    </button>
+                                                                }.into_view()
+                                                            }else{
+                                                                view! {}.into_view()
+                                                            }
                                                         }else {
                                                             view! {}.into_view()
                                                         }
