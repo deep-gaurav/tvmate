@@ -8,8 +8,9 @@ use web_sys::MediaStream;
 use crate::{
     apis::get_room_info,
     components::{
-        audio_chat::AudioChat, chatbox::ChatBox, join_dialog::JoinDialog, room_info::RoomInfo,
-        video_chat::VideoChat, video_player::VideoPlayer,
+        audio_chat::AudioChat, chatbox::ChatBox, help_dialog::RoomHelpDialog,
+        join_dialog::JoinDialog, room_info::RoomInfo, video_chat::VideoChat,
+        video_player::VideoPlayer,
     },
     networking::room_manager::RoomManager,
 };
@@ -91,6 +92,7 @@ pub fn RoomPage() -> impl IntoView {
     });
 
     view! {
+        <RoomHelpDialog/>
         <JoinDialog
             is_open=join_dialog_open
             on_close=Callback::new(move|_|{
