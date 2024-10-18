@@ -17,6 +17,8 @@ pub fn IntroHelpDialog() -> impl IntoView {
         <div class="fixed top-4 right-4 z-[60]">
             <button type="button"
                 class="w-10 md:w-6"
+                class=("hidden", is_open)
+
                 on:click=move|_|{
                     set_is_open.set(true);
                 }
@@ -45,7 +47,7 @@ pub fn IntroHelpDialog() -> impl IntoView {
         </div>
         <Show when=move||is_open.get()>
             <div class="fixed bg-black/50 top-0 left-0 h-full w-full flex items-center justify-center p-6 z-50">
-                <div class="lg:max-w-[60%] h-fit text-white font-bold1">
+                <div class="lg:max-w-[60%] h-fit max-h-full overflow-auto text-white font-bold1">
                     <Dialog
                         is_self_sized=true
                         is_open=true
@@ -121,6 +123,7 @@ pub fn RoomHelpDialog() -> impl IntoView {
         <div class="fixed top-4 right-4 z-[60]">
             <button type="button"
                 class="w-10 md:w-6"
+                class=("hidden", is_open)
                 on:click=move|_|{
                     set_is_open.set(true);
                 }
@@ -130,7 +133,7 @@ pub fn RoomHelpDialog() -> impl IntoView {
         </div>
         <Show when=move||is_open.get()>
             <div class="fixed bg-black/50 top-0 left-0 h-full w-full flex items-center justify-center p-6 z-50">
-                <div class="lg:max-w-[60%] h-fit text-white font-bold1">
+                <div class="lg:max-w-[60%] h-fit max-h-full overflow-auto text-white font-bold1">
                     <Dialog
                         is_self_sized=true
                         is_open=true
