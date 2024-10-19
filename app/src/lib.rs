@@ -23,6 +23,7 @@ pub mod web_glue;
 #[derive(Clone)]
 pub struct MountPoints {
     pub handle_point: NodeRef<leptos::html::Div>,
+    pub side_point_2: NodeRef<leptos::html::Div>,
     pub side_point: NodeRef<leptos::html::Div>,
     pub speaker_point: NodeRef<leptos::html::Div>,
     pub main_point: NodeRef<leptos::html::Div>,
@@ -44,12 +45,14 @@ pub fn App() -> impl IntoView {
 
     let handle_point = create_node_ref();
     let side_point = create_node_ref();
+    let side_point_2 = create_node_ref();
     let speaker_point = create_node_ref();
     let main_point = create_node_ref();
 
     let mount_points = MountPoints {
         handle_point,
         side_point,
+        side_point_2,
         speaker_point,
         main_point,
     };
@@ -98,6 +101,8 @@ pub fn App() -> impl IntoView {
                     }
                 }
             >
+                <div ref=side_point_2></div>
+
                 <div
                     class="relative aspect-[1042/751] flex-shrink-0"
                     style=move || { if is_landscape.get() { "height:100%" } else { "width:100%" } }
