@@ -19,8 +19,8 @@
         <option name="gradleJvm" value="#GRADLE_LOCAL_JAVA_HOME" />
         <option name="modules">
           <set>
-            <option value="$USER_HOME$/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tauri-2.0.0-rc.15/mobile/android" />
-            <option value="$USER_HOME$/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tauri-plugin-shell-2.0.0-rc.3/android" />
+            <option value="$USER_HOME$/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tauri-2.0.1/mobile/android" />
+            <option value="$USER_HOME$/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tauri-plugin-shell-2.0.1/android" />
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/app" />
             <option value="$PROJECT_DIR$/buildSrc" />
