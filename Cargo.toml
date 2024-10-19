@@ -8,7 +8,7 @@ members = ["app", "common", "frontend", "server", "tauri", "tauri/src-tauri"]
 [profile.release]
 codegen-units = 1
 lto = true
-opt-level = 'z'
+opt-level = 3
 strip = true
 
 [profile.dev]
