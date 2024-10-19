@@ -11,7 +11,7 @@ pub enum Message {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum ClientMessage {
-    SelectedVideo(String),
+    SetVideoMeta(VideoMeta),
     Play(f64),
     Pause(f64),
     Seek(f64),
@@ -79,4 +79,10 @@ pub struct RTCSessionDesc {
     pub typ: String,
     pub sdp: String,
     pub reason: OfferReason,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct VideoMeta {
+    pub name: String,
+    pub duration: Option<f64>,
 }

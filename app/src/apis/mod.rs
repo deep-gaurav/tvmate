@@ -1,4 +1,4 @@
-use leptos::{expect_context, server, use_context, ServerFnError};
+use leptos::{server, use_context, ServerFnError};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -19,7 +19,12 @@ pub async fn get_room_info(room_id: String) -> Result<Option<RoomMetaInfo>, Serv
             room.users.first().map(|host| RoomMetaInfo {
                 room_id: room_id.clone(),
                 host: host.meta.name.clone(),
-                selected_video: host.meta.state.as_video_selected().cloned(),
+                selected_video: host
+                    .meta
+                    .state
+                    .as_video_selected()
+                    .map(|v| &v.name)
+                    .cloned(),
             })
         })
         .await

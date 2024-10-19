@@ -6,7 +6,7 @@ pub mod util;
 
 use std::time::Instant;
 
-use message::Message;
+use message::{Message, VideoMeta};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -24,11 +24,11 @@ pub struct User {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum UserState {
     VideoNotSelected,
-    VideoSelected(String),
+    VideoSelected(VideoMeta),
 }
 
 impl UserState {
-    pub fn as_video_selected(&self) -> Option<&String> {
+    pub fn as_video_selected(&self) -> Option<&VideoMeta> {
         if let Self::VideoSelected(v) = self {
             Some(v)
         } else {
@@ -41,6 +41,15 @@ impl UserState {
 pub enum PlayerStatus {
     Paused(f64),
     Playing(f64),
+}
+
+impl PlayerStatus {
+    pub fn get_time(&self) -> f64 {
+        match self {
+            PlayerStatus::Paused(f) => *f,
+            PlayerStatus::Playing(f) => *f,
+        }
+    }
 }
 
 impl PlayerStatus {

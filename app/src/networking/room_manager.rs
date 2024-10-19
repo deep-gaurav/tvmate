@@ -5,6 +5,7 @@ use common::{
     endpoints,
     message::{
         ClientMessage, Message, OfferReason, RTCSessionDesc, RtcConfig, UserJoined, UserLeft,
+        VideoMeta,
     },
     params::{HostParams, JoinParams},
     PlayerStatus, UserMeta, UserState,
@@ -71,8 +72,14 @@ pub struct RoomManager {
     pub permission_request_signal: Signal<Option<(Uuid, bool, bool)>>,
     permission_request_sender: WriteSignal<Option<(Uuid, bool, bool)>>,
 
-    pub share_video_signal: Signal<(Option<MediaStreamTrack>, Option<MediaStreamTrack>)>,
-    share_video_writer: WriteSignal<(Option<MediaStreamTrack>, Option<MediaStreamTrack>)>,
+    pub share_video_signal: Signal<(
+        Option<(Uuid, MediaStreamTrack)>,
+        Option<(Uuid, MediaStreamTrack)>,
+    )>,
+    share_video_writer: WriteSignal<(
+        Option<(Uuid, MediaStreamTrack)>,
+        Option<(Uuid, MediaStreamTrack)>,
+    )>,
 
     pub share_video_permission: Signal<Option<Uuid>>,
     share_video_permission_tx: WriteSignal<Option<Uuid>>,
@@ -571,7 +578,7 @@ impl RoomManager {
                                     }
                                 },
                                 Message::ClientMessage((from_user, message)) => match message {
-                                    common::message::ClientMessage::SelectedVideo(video_name) => {
+                                    common::message::ClientMessage::SetVideoMeta(video_name) => {
                                         let room_info = room_info_reader.get_untracked();
                                         if let Some(mut room_info) = room_info {
                                             if let Some(user) = room_info
@@ -738,12 +745,49 @@ impl RoomManager {
                 .iter_mut()
                 .find(|u| u.id == room_info.user_id)
             {
-                user.state = UserState::VideoSelected(video_name.clone());
-                self.room_info_signal.1.set(Some(room_info));
+                match &mut user.state {
+                    UserState::VideoNotSelected => {
+                        user.state = UserState::VideoSelected(VideoMeta {
+                            name: video_name.clone(),
+                            duration: None,
+                        });
+                    }
+                    UserState::VideoSelected(video_meta) => {
+                        video_meta.name = video_name.to_string();
+                    }
+                };
                 self.send_message(
-                    common::message::ClientMessage::SelectedVideo(video_name),
+                    common::message::ClientMessage::SetVideoMeta(
+                        user.state.as_video_selected().unwrap().clone(),
+                    ),
                     crate::networking::room_manager::SendType::Reliable,
                 );
+                self.room_info_signal.1.set(Some(room_info));
+            }
+        }
+    }
+
+    pub fn set_video_duration(&self, duration: f64) {
+        if let Some(mut room_info) = self.room_info_signal.0.get_untracked() {
+            if let Some(user) = room_info
+                .users
+                .iter_mut()
+                .find(|u| u.id == room_info.user_id)
+            {
+                match &mut user.state {
+                    UserState::VideoNotSelected => {
+                        warn!("Cannot set video duration without video");
+                        return;
+                    }
+                    UserState::VideoSelected(video_meta) => video_meta.duration = Some(duration),
+                };
+                self.send_message(
+                    common::message::ClientMessage::SetVideoMeta(
+                        user.state.as_video_selected().unwrap().clone(),
+                    ),
+                    crate::networking::room_manager::SendType::Reliable,
+                );
+                self.room_info_signal.1.set(Some(room_info));
             }
         }
     }

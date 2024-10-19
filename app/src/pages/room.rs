@@ -65,16 +65,21 @@ pub fn RoomPage() -> impl IntoView {
         let stream = MediaStream::new();
         if let Ok(stream) = stream {
             let (video, audio) = video_stream_signal.get();
-            if let Some(video) = &video {
+            let mut user = None;
+            if let Some((vu, video)) = &video {
                 stream.add_track(video);
+                user = Some(*vu);
             }
-            if let Some(audio) = &audio {
+            if let Some((au, audio)) = &audio {
                 stream.add_track(audio);
+                user = Some(*au);
             }
             if video.is_some() || audio.is_some() {
-                set_video_url.set(Some(crate::components::video_player::VideoSource::Stream(
-                    stream,
-                )))
+                if let Some(user) = user {
+                    set_video_url.set(Some(crate::components::video_player::VideoSource::Stream(
+                        (user, stream),
+                    )))
+                }
             }
         }
     });

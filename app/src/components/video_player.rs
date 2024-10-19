@@ -5,6 +5,7 @@ use leptos_use::{
 };
 use logging::warn;
 use tracing::info;
+use uuid::Uuid;
 use wasm_bindgen::JsCast;
 use web_sys::MediaStream;
 
@@ -44,7 +45,7 @@ impl std::fmt::Display for VideoState {
 #[derive(Clone)]
 pub enum VideoSource {
     Url(String),
-    Stream(MediaStream),
+    Stream((Uuid, MediaStream)),
 }
 
 #[derive(Clone, PartialEq)]
@@ -152,8 +153,15 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                         }
                         crate::networking::room_manager::PlayerMessages::Update(_) => {}
                         crate::networking::room_manager::PlayerMessages::Seek(time) => {
-                            if VideoType::Local == video_type.get_value() {
-                                video.set_current_time(*time);
+                            match video_type.get_value() {
+                                VideoType::None
+                                | VideoType::Local
+                                | VideoType::LocalStreamingOut => {
+                                    video.set_current_time(*time);
+                                }
+                                VideoType::RemoteStreamingIn => {
+                                    //Ignore
+                                }
                             }
                         }
                     }
@@ -166,8 +174,15 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                             if let Some(current_time) = current_time.get_untracked() {
                                 if ((current_time - time) as f64).abs() > 15.0 {
                                     info!("Time difference big, seeking to time");
-                                    if VideoType::Local == video_type.get_value() {
-                                        video.set_current_time(time);
+                                    match video_type.get_value() {
+                                        VideoType::None
+                                        | VideoType::Local
+                                        | VideoType::LocalStreamingOut => {
+                                            video.set_current_time(time);
+                                        }
+                                        VideoType::RemoteStreamingIn => {
+                                            //Ignore
+                                        }
                                     }
                                 }
                             }
@@ -230,7 +245,9 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
 
     create_effect(move |_| {
         if let Some(time) = current_time.get() {
-            send_update_throttled(time);
+            if video_type.get_value() != VideoType::RemoteStreamingIn {
+                send_update_throttled(time);
+            }
         }
     });
 
@@ -247,10 +264,37 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
 
     let (chat_msg, set_chat_msg) = create_signal(String::new());
 
+    let room_info = expect_context::<RoomManager>().get_room_info();
     create_effect(move |_| {
-        if let Some(VideoSource::Stream(stream)) = src.get() {
+        if let Some(VideoSource::Stream((user_id, stream))) = src.get() {
             if let Some(video_node) = video_node.get_untracked() {
                 video_node.set_src_object(Some(&stream));
+                let video_length = create_memo(move |_| {
+                    let user = room_info
+                        .with_untracked(|r| {
+                            r.as_ref()
+                                .map(|r| r.users.iter().find(|user| user.id == user_id).cloned())
+                        })
+                        .flatten();
+                    if let Some(user) = user {
+                        user.state.as_video_selected().and_then(|v| v.duration)
+                    } else {
+                        None
+                    }
+                });
+                create_effect(move |_| {
+                    set_duration.set(video_length.get());
+                });
+            }
+        }
+    });
+
+    create_effect(move |_| {
+        if let Some(player_status) = room_info.with(|r| r.as_ref().map(|r| r.player_status.clone()))
+        {
+            info!("Player status {player_status:?}");
+            if video_type.get_value() == VideoType::RemoteStreamingIn {
+                set_current_time.set(Some(player_status.get_time()));
             }
         }
     });
@@ -294,23 +338,31 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                     on:waiting=move |_| { set_video_state.set(VideoState::Waiting) }
                     on:seeking=move |_| { set_video_state.set(VideoState::Seeking) }
                     on:seeked=move |_| {
-                        if let Some(video) = video_node.get() {
-                            if video.paused() {
-                                set_video_state.set(VideoState::Paused)
-                            } else {
-                                set_video_state.set(VideoState::Playing)
+                        if video_type.get_value() != VideoType::RemoteStreamingIn {
+                            if let Some(video) = video_node.get() {
+                                if video.paused() {
+                                    set_video_state.set(VideoState::Paused)
+                                } else {
+                                    set_video_state.set(VideoState::Playing)
+                                }
                             }
                         }
                     }
 
                     on:durationchange=move |_| {
-                        if let Some(video) = video_node.get() {
-                            set_duration.set(Some(video.duration()));
+                        if video_type.get_value() != VideoType::RemoteStreamingIn {
+                            if let Some(video) = video_node.get() {
+                                let rm = expect_context::<RoomManager>();
+                                set_duration.set(Some(video.duration()));
+                                rm.set_video_duration(video.duration());
+                            }
                         }
                     }
                     on:timeupdate=move |_| {
                         if let Some(video) = video_node.get() {
-                            set_current_time.set(Some(video.current_time()));
+                            if video_type.get_value() != VideoType::RemoteStreamingIn {
+                                set_current_time.set(Some(video.current_time()));
+                            }
                         }
                     }
                 >
@@ -452,8 +504,14 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                                     video_node.get_untracked(),
                                     duration.get_untracked(),
                                 ) {
-                                    if VideoState::Seeking != video_state.get_untracked() {
-                                        let new_time = (x as f64) / (width as f64) * total;
+                                    let new_time = (x as f64) / (width as f64) * total;
+                                    if video_type.get_value() == VideoType::RemoteStreamingIn {
+                                        room_manager_c
+                                        .send_message(
+                                            common::message::ClientMessage::Seek(new_time),
+                                            crate::networking::room_manager::SendType::Reliable,
+                                        );
+                                    }else if VideoState::Seeking != video_state.get_untracked() {
                                         video.set_current_time(new_time);
                                         room_manager_c
                                             .send_message(
@@ -461,6 +519,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                                                 crate::networking::room_manager::SendType::Reliable,
                                             );
                                     }
+
                                 }
                             }
                         }

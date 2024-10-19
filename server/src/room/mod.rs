@@ -157,10 +157,11 @@ async fn handle_websocket(
                                                                 common::message::ClientMessage::Chat(_) => {
                                                                     app_state.rooms.broadcast_msg_excluding(room_id, original_message, &[user_id]).await;
                                                                 }
-                                                                common::message::ClientMessage::SelectedVideo(video_name) => {
+                                                                common::message::ClientMessage::SetVideoMeta(video_name) => {
                                                                     app_state.rooms.with_room_mut(room_id, |room|{
                                                                         if let Some(user) = room.users.iter_mut().find(|u|u.meta.id == user_id)
                                                                         {
+
                                                                             user.meta.state = UserState::VideoSelected(video_name.clone());
                                                                         }
                                                                     }).await;

@@ -138,7 +138,10 @@ pub async fn connect_to_user<F>(
 
     video_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
     audio_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
-    video_share_setter: WriteSignal<(Option<MediaStreamTrack>, Option<MediaStreamTrack>)>,
+    video_share_setter: WriteSignal<(
+        Option<(Uuid, MediaStreamTrack)>,
+        Option<(Uuid, MediaStreamTrack)>,
+    )>,
     video_offer_tyoe: StoredValue<OfferReason>,
 
     rtc_setter: Callback<(Uuid, Option<RtcPeerConnection>), ()>,
@@ -185,7 +188,7 @@ where
                                 if video_track_ids.contains(&track.id()) {
                                     video_share_setter.update(|(video, audio)| {
                                         info!("Add shared audio");
-                                        *audio = Some(track);
+                                        *audio = Some((user, track));
                                     });
                                 } else {
                                     audio_media_setter.call((user, Some(stream)));
@@ -196,7 +199,7 @@ where
                                 if video_track_ids.contains(&track.id()) {
                                     video_share_setter.update(|(video, audio)| {
                                         info!("Add shared video");
-                                        *video = Some(track);
+                                        *video = Some((user, track));
                                     });
                                 } else {
                                     video_media_setter.call((user, Some(stream)));
@@ -443,7 +446,10 @@ pub fn receive_peer_connections<F>(
     video_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
     audio_media_setter: Callback<(Uuid, Option<MediaStream>), ()>,
 
-    video_share_setter: WriteSignal<(Option<MediaStreamTrack>, Option<MediaStreamTrack>)>,
+    video_share_setter: WriteSignal<(
+        Option<(Uuid, MediaStreamTrack)>,
+        Option<(Uuid, MediaStreamTrack)>,
+    )>,
     video_offer_type: StoredValue<OfferReason>,
 
     ice_callback: Callback<(Uuid, String)>,
@@ -650,7 +656,7 @@ pub fn receive_peer_connections<F>(
                                         {
                                             if video_track_ids.contains(&track.id()) {
                                                 video_share_setter.update(|(video, audio)| {
-                                                    *audio = Some(track);
+                                                    *audio = Some((from_user, track));
                                                 });
                                             } else {
                                                 audio_media_setter.call((from_user, Some(stream)));
@@ -660,7 +666,7 @@ pub fn receive_peer_connections<F>(
                                         {
                                             if video_track_ids.contains(&track.id()) {
                                                 video_share_setter.update(|(video, audio)| {
-                                                    *video = Some(track);
+                                                    *video = Some((from_user, track));
                                                 });
                                             } else {
                                                 video_media_setter.call((from_user, Some(stream)));
