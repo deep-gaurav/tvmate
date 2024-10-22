@@ -20,7 +20,7 @@ use crate::{
 enum VideoState {
     Playing,
     Paused,
-    Waiting,
+    Loading,
     Ended,
     Errored,
     Stalled,
@@ -33,7 +33,7 @@ impl std::fmt::Display for VideoState {
         match self {
             VideoState::Playing => write!(f, "Playing"),
             VideoState::Paused => write!(f, "Paused"),
-            VideoState::Waiting => write!(f, "Waiting"),
+            VideoState::Loading => write!(f, "Waiting"),
             VideoState::Ended => write!(f, "Ended"),
             VideoState::Errored => write!(f, "Errored"),
             VideoState::Stalled => write!(f, "Stalled"),
@@ -61,7 +61,7 @@ pub enum VideoType {
 pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoView {
     let video_node = create_node_ref::<leptos::html::Video>();
 
-    let (video_state, set_video_state) = create_signal(VideoState::Waiting);
+    let (video_state, set_video_state) = create_signal(VideoState::Loading);
 
     let (current_time, set_current_time) = create_signal(None);
     let (duration, set_duration) = create_signal(None);
@@ -88,6 +88,8 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
     let share_permission_sig = room_manager.share_video_permission;
 
     let video_type = store_value(VideoType::None);
+
+    let before_seek = store_value(Option::<bool>::None);
     create_effect({
         let room_manager = room_manager.clone();
 
@@ -148,7 +150,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                 let player_status = match video_state.get_untracked() {
                     VideoState::Playing => PlayerStatus::Playing(0.0),
                     VideoState::Paused
-                    | VideoState::Waiting
+                    | VideoState::Loading
                     | VideoState::Ended
                     | VideoState::Errored
                     | VideoState::Stalled
@@ -177,12 +179,15 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                             }
                         }
                         crate::networking::room_manager::PlayerMessages::Update(_) => {}
-                        crate::networking::room_manager::PlayerMessages::Seek(time) => {
+                        crate::networking::room_manager::PlayerMessages::Seek(time, beforeseek) => {
                             match video_type.get_value() {
                                 VideoType::None
                                 | VideoType::Local
                                 | VideoType::LocalStreamingOut => {
+                                    video.pause();
+
                                     video.set_current_time(*time);
+                                    before_seek.set_value(Some(*beforeseek));
                                 }
                                 VideoType::RemoteStreamingIn => {
                                     //Ignore
@@ -191,22 +196,26 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                         }
                     }
 
-                    match message {
-                        crate::networking::room_manager::PlayerMessages::Play(time)
-                        | crate::networking::room_manager::PlayerMessages::Pause(time)
-                        | crate::networking::room_manager::PlayerMessages::Update(time)
-                        | crate::networking::room_manager::PlayerMessages::Seek(time) => {
-                            if let Some(current_time) = current_time.get_untracked() {
-                                if ((current_time - time) as f64).abs() > 15.0 {
-                                    info!("Time difference big, seeking to time");
-                                    match video_type.get_value() {
-                                        VideoType::None
-                                        | VideoType::Local
-                                        | VideoType::LocalStreamingOut => {
-                                            video.set_current_time(time);
-                                        }
-                                        VideoType::RemoteStreamingIn => {
-                                            //Ignore
+                    if video_state.get_untracked() == VideoState::Paused
+                        || video_state.get_untracked() == VideoState::Playing
+                    {
+                        match message {
+                            crate::networking::room_manager::PlayerMessages::Play(time)
+                            | crate::networking::room_manager::PlayerMessages::Pause(time)
+                            | crate::networking::room_manager::PlayerMessages::Update(time)
+                            | crate::networking::room_manager::PlayerMessages::Seek(time, _) => {
+                                if let Some(current_time) = current_time.get_untracked() {
+                                    if ((current_time - time) as f64).abs() > 15.0 {
+                                        info!("Time difference big, seeking to time");
+                                        match video_type.get_value() {
+                                            VideoType::None
+                                            | VideoType::Local
+                                            | VideoType::LocalStreamingOut => {
+                                                video.set_current_time(time);
+                                            }
+                                            VideoType::RemoteStreamingIn => {
+                                                //Ignore
+                                            }
                                         }
                                     }
                                 }
@@ -221,39 +230,18 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
     create_effect(move |_| {
         let video_state = video_state.get();
         let time = current_time.get_untracked().unwrap_or_default();
-        let player_status = match video_state {
-            VideoState::Playing => PlayerStatus::Playing(time),
-            VideoState::Paused
-            | VideoState::Waiting
-            | VideoState::Ended
-            | VideoState::Errored
-            | VideoState::Stalled
-            | VideoState::Suspend
-            | VideoState::Seeking => PlayerStatus::Paused(time),
+
+        match video_state {
+            VideoState::Playing => room_manager.send_message(
+                common::message::ClientMessage::Play(time),
+                crate::networking::room_manager::SendType::Reliable,
+            ),
+            VideoState::Paused => room_manager.send_message(
+                common::message::ClientMessage::Pause(time),
+                crate::networking::room_manager::SendType::Reliable,
+            ),
+            _ => {}
         };
-        if video_state != VideoState::Seeking {
-            if let Some(room_player_status) = room_manager.get_player_status() {
-                if room_player_status.is_paused() != player_status.is_paused() {
-                    room_manager.set_player_status(player_status.clone());
-                    match player_status {
-                        PlayerStatus::Paused(time) => {
-                            info!("Sending pause");
-                            room_manager.send_message(
-                                common::message::ClientMessage::Pause(time),
-                                crate::networking::room_manager::SendType::Reliable,
-                            );
-                        }
-                        PlayerStatus::Playing(time) => {
-                            info!("Sending play");
-                            room_manager.send_message(
-                                common::message::ClientMessage::Play(time),
-                                crate::networking::room_manager::SendType::Reliable,
-                            );
-                        }
-                    }
-                }
-            }
-        }
     });
 
     let send_update_throttled = use_throttle_fn_with_arg(
@@ -270,7 +258,10 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
 
     create_effect(move |_| {
         if let Some(time) = current_time.get() {
-            if video_type.get_value() != VideoType::RemoteStreamingIn {
+            if video_type.get_value() != VideoType::RemoteStreamingIn
+                && video_state.get() == VideoState::Paused
+                || video_state.get() == VideoState::Playing
+            {
                 send_update_throttled(time);
             }
         }
@@ -290,6 +281,8 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
     let (chat_msg, set_chat_msg) = create_signal(String::new());
 
     let room_info = expect_context::<RoomManager>().get_room_info();
+
+    let (is_seeking, set_is_seeking) = create_signal(false);
     create_effect(move |_| {
         if let Some(VideoSource::Stream((user_id, stream))) = src.get() {
             if let Some(video_node) = video_node.get_untracked() {
@@ -333,6 +326,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                 <video
                     ref=video_node
                     class="h-full w-full"
+                    preload="auto"
                     on:canplay=move |_| {
                         if let Some(video) = video_node.get_untracked() {
                             if video.paused() {
@@ -356,12 +350,12 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                     }
                     on:error=move |_| { set_video_state.set(VideoState::Errored) }
                     on:pause=move |_| { set_video_state.set(VideoState::Paused) }
-                    on:play=move |_| { set_video_state.set(VideoState::Playing) }
+                    on:play=move |_| { set_video_state.set(VideoState::Playing); set_is_seeking.set(false); }
                     on:playing=move |_| { set_video_state.set(VideoState::Playing) }
                     on:stalled=move |_| { set_video_state.set(VideoState::Stalled) }
                     on:suspend=move |_| { set_video_state.set(VideoState::Suspend) }
                     on:waiting=move |_| {
-                        set_video_state.set(VideoState::Waiting);
+                        set_video_state.set(VideoState::Loading);
                         let toaster = expect_context::<Toaster>();
 
                         let UseTimeoutFnReturn {
@@ -370,7 +364,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                         } = with_owner(owner.expect("Player owner expected"), ||{
                             use_timeout_fn(
                                 move |_:()| {
-                                    if video_state.get_untracked() == VideoState::Waiting {
+                                    if video_state.get_untracked() == VideoState::Loading {
                                         toaster.toast(Toast { message: "Video seems to have stalled".into(), r#type: crate::components::toaster::ToastType::Failed });
                                         if let Some(video) = video_node.get_untracked(){
                                             video.load();
@@ -390,6 +384,15 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                                     set_video_state.set(VideoState::Paused)
                                 } else {
                                     set_video_state.set(VideoState::Playing)
+                                }
+
+                                if let Some(beforeseek) = before_seek.get_value(){
+                                    if beforeseek {
+                                        video.play();
+                                    }else{
+                                        video.pause();
+                                    }
+                                    before_seek.set_value(None);
                                 }
                             }
                         }
@@ -512,21 +515,21 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                                         }
                                     }
                                 }
-                                VideoState::Paused | VideoState::Waiting => {
+                                _ => {
                                     if let Some(video) = video_node.get_untracked() {
                                         if let Err(err) = video.play() {
                                             warn!("Errored Playing {err:#?}");
                                         }
                                     }
                                 }
-                                state => info!("Cant do anything in state {state}"),
+
                             }
                         }
                     >
                         {move || match video_state.get() {
                             VideoState::Playing => "Pause".to_string(),
                             VideoState::Paused => "Play".to_string(),
-                            VideoState::Waiting => {
+                            VideoState::Loading => {
                                 if let Some(video) = video_node.get() {
                                     if video.current_time() == 0.0 { "Play" } else { "Waiting" }
                                 } else {
@@ -554,14 +557,17 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                                     if video_type.get_value() == VideoType::RemoteStreamingIn {
                                         room_manager_c
                                         .send_message(
-                                            common::message::ClientMessage::Seek(new_time),
+                                            common::message::ClientMessage::Seek(new_time, !video.paused()),
                                             crate::networking::room_manager::SendType::Reliable,
                                         );
                                     }else if VideoState::Seeking != video_state.get_untracked() {
+                                        let is_playing = !video.paused();
+                                        video.pause();
                                         video.set_current_time(new_time);
+                                        set_is_seeking.set(true);
                                         room_manager_c
                                             .send_message(
-                                                common::message::ClientMessage::Seek(new_time),
+                                                common::message::ClientMessage::Seek(new_time, is_playing),
                                                 crate::networking::room_manager::SendType::Reliable,
                                             );
                                     }

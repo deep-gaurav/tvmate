@@ -179,7 +179,7 @@ async fn handle_websocket(
                                                                     }).await;
                                                                     app_state.rooms.broadcast_msg_excluding(room_id, original_message, &[user_id]).await;
                                                                 },
-                                                                common::message::ClientMessage::Seek(val) | common::message::ClientMessage::Update(val) => {
+                                                                common::message::ClientMessage::Seek(val,_) | common::message::ClientMessage::Update(val) => {
                                                                     app_state.rooms.with_room_mut(room_id, |room|{
                                                                         match &mut room.player_status {
                                                                             PlayerStatus::Paused(time) | PlayerStatus::Playing(time) => *time = *val,
