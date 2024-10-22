@@ -169,7 +169,7 @@ pub enum PlayerMessages {
     Play(f64),
     Pause(f64),
     Update(f64),
-    Seek(f64),
+    Seek(f64, bool),
 }
 
 pub enum SendType {
@@ -611,7 +611,7 @@ impl RoomManager {
                                         player_messages_sender
                                             .set(Some(PlayerMessages::Pause(time)));
                                     }
-                                    common::message::ClientMessage::Seek(time) => {
+                                    common::message::ClientMessage::Seek(time, before_seek) => {
                                         if let Some(mut room_info) =
                                             room_info_reader.get_untracked()
                                         {
@@ -624,7 +624,7 @@ impl RoomManager {
                                             room_info_writer.set(Some(room_info));
                                         }
                                         player_messages_sender
-                                            .set(Some(PlayerMessages::Seek(time)));
+                                            .set(Some(PlayerMessages::Seek(time, before_seek)));
                                     }
                                     common::message::ClientMessage::Update(time) => {
                                         if let Some(mut room_info) =

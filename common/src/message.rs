@@ -14,7 +14,7 @@ pub enum ClientMessage {
     SetVideoMeta(VideoMeta),
     Play(f64),
     Pause(f64),
-    Seek(f64),
+    Seek(f64, bool),
     Update(f64),
     Chat(String),
     // RequestRTCCreds,
