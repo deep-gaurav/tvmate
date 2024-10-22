@@ -1,7 +1,8 @@
 use common::PlayerStatus;
 use leptos::*;
 use leptos_use::{
-    use_event_listener, use_throttle_fn_with_arg, use_timeout_fn, UseTimeoutFnReturn,
+    use_event_listener, use_interval_fn, use_throttle_fn_with_arg, use_timeout_fn,
+    UseIntervalReturn, UseTimeoutFnReturn,
 };
 use logging::warn;
 use tracing::info;
@@ -104,11 +105,24 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
         }
     });
 
+    let owner = Owner::current();
     create_effect(move |_| {
         if let Some(video_source_type) = src.get() {
             match video_source_type {
                 VideoSource::Url(_) => {
                     video_type.set_value(VideoType::Local);
+                    let UseTimeoutFnReturn { start, .. } =
+                        with_owner(owner.expect("Player owner expected"), || {
+                            use_timeout_fn(
+                                move |_: ()| {
+                                    if let Some(video) = video_node.get_untracked() {
+                                        video.load()
+                                    }
+                                },
+                                100.0,
+                            )
+                        });
+                    start(());
                 }
                 VideoSource::Stream(_) => {
                     video_type.set_value(VideoType::RemoteStreamingIn);
@@ -116,6 +130,17 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
             }
         }
     });
+
+    let (time_range, set_time_range) = create_signal(None);
+
+    use_interval_fn(
+        move || {
+            if let Some(video) = video_node.get_untracked() {
+                set_time_range.set(Some(video.buffered()));
+            }
+        },
+        1000,
+    );
 
     create_effect(move |_| {
         if let Some(video) = video_node.get() {
@@ -335,7 +360,28 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                     on:playing=move |_| { set_video_state.set(VideoState::Playing) }
                     on:stalled=move |_| { set_video_state.set(VideoState::Stalled) }
                     on:suspend=move |_| { set_video_state.set(VideoState::Suspend) }
-                    on:waiting=move |_| { set_video_state.set(VideoState::Waiting) }
+                    on:waiting=move |_| {
+                        set_video_state.set(VideoState::Waiting);
+                        let toaster = expect_context::<Toaster>();
+
+                        let UseTimeoutFnReturn {
+                            start,
+                            ..
+                        } = with_owner(owner.expect("Player owner expected"), ||{
+                            use_timeout_fn(
+                                move |_:()| {
+                                    if video_state.get_untracked() == VideoState::Waiting {
+                                        toaster.toast(Toast { message: "Video seems to have stalled".into(), r#type: crate::components::toaster::ToastType::Failed });
+                                        if let Some(video) = video_node.get_untracked(){
+                                            video.load();
+                                        }
+                                    }
+                                },
+                                5000.0,
+                            )
+                        });
+                        start(());
+                    }
                     on:seeking=move |_| { set_video_state.set(VideoState::Seeking) }
                     on:seeked=move |_| {
                         if video_type.get_value() != VideoType::RemoteStreamingIn {
@@ -537,6 +583,33 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                                 }
                             }
                         />
+
+                        {
+                            move || {
+                                let timeranges = time_range.get();
+                                if let (Some(timeranges), Some(total)) = (timeranges, duration.get()) {
+
+                                    let mut views = vec![];
+
+                                    for i in 0..timeranges.length() {
+                                        let start = timeranges.start(i);
+                                        let end = timeranges.end(i);
+                                        if let (Ok(start), Ok(end)) = (start, end) {
+                                            let style = format!("left: {}%; width: {}%;", start * 100.0 / total, (end-start) *100.0 / total );
+                                            views.push(view! {
+                                                <div
+                                                    class="absolute top-0 h-full bg-red-500/50 pointer-events-none"
+                                                    style=style
+                                                />
+                                            });
+                                        }
+                                    }
+                                    views.into_view()
+                                }else{
+                                    view! {}.into_view()
+                                }
+                            }
+                        }
 
                     </div>
 

@@ -111,6 +111,7 @@ features = [
     "ShareData",
 
     "HtmlMediaElement",
+    "TimeRanges",
 ]
 
 # See https://github.com/akesson/cargo-leptos for documentation of all the parameters.
