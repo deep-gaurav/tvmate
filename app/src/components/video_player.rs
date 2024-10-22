@@ -356,25 +356,6 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                     on:suspend=move |_| { set_video_state.set(VideoState::Suspend) }
                     on:waiting=move |_| {
                         set_video_state.set(VideoState::Loading);
-                        let toaster = expect_context::<Toaster>();
-
-                        let UseTimeoutFnReturn {
-                            start,
-                            ..
-                        } = with_owner(owner.expect("Player owner expected"), ||{
-                            use_timeout_fn(
-                                move |_:()| {
-                                    if video_state.get_untracked() == VideoState::Loading {
-                                        toaster.toast(Toast { message: "Video seems to have stalled".into(), r#type: crate::components::toaster::ToastType::Failed });
-                                        if let Some(video) = video_node.get_untracked(){
-                                            video.load();
-                                        }
-                                    }
-                                },
-                                5000.0,
-                            )
-                        });
-                        start(());
                     }
                     on:seeking=move |_| { set_video_state.set(VideoState::Seeking) }
                     on:seeked=move |_| {
@@ -507,18 +488,23 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                         type="button"
                         class="text-2xl font-bold2"
                         on:click=move |_| {
+                            let toaster = expect_context::<Toaster>();
                             match video_state.get_untracked() {
                                 VideoState::Playing => {
                                     if let Some(video) = video_node.get_untracked() {
                                         if let Err(err) = video.pause() {
-                                            warn!("Errored Pausing {err:#?}");
+                                            toaster.toast(
+                                                Toast { message: format!("Errored Pausing {err:#?}").into(), r#type: crate::components::toaster::ToastType::Failed }
+                                            );
                                         }
                                     }
                                 }
                                 _ => {
                                     if let Some(video) = video_node.get_untracked() {
                                         if let Err(err) = video.play() {
-                                            warn!("Errored Playing {err:#?}");
+                                            toaster.toast(
+                                                Toast { message: format!("Errored Playing {err:#?}").into(), r#type: crate::components::toaster::ToastType::Failed }
+                                            );
                                         }
                                     }
                                 }
@@ -540,6 +526,21 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                             state => state.to_string(),
                         }}
                     </button>
+                    {move || {
+                        if let Some(VideoSource::Url(url)) = src.get() {
+                            view! {
+                                <a
+                                    target="_blank"
+                                    class="text-2xl font-bold2"
+                                    href=url
+                                >
+                                    "Open in new tab"
+                                </a>
+                            }.into_view()
+                        } else {
+                            view! {}.into_view()
+                        }
+                    }}
 
                     <div
                         class="absolute w-[90%] top-[80%] left-[5%] h-4 bg-white/45 cursor-pointer"
@@ -571,7 +572,6 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                                                 crate::networking::room_manager::SendType::Reliable,
                                             );
                                     }
-
                                 }
                             }
                         }
