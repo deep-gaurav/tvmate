@@ -337,6 +337,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                     ref=video_node
                     class="h-full w-full"
                     preload="auto"
+                    controls
                     on:canplay=move |_| {
                         debug!("video: Received canplay");
                         if let Some(video) = video_node.get_untracked() {
@@ -519,7 +520,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                 }}
                 <div
                     class="absolute h-full w-full top-0 left-0 bg-black/70 opacity-0
-                    flex flex-col items-center justify-center
+                    flex flex-col items-center justify-center hidden
                     "
                     class=("opacity-100", is_ui_open)
                     on:mousemove=move |_| {
