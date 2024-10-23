@@ -5,7 +5,7 @@ use leptos_use::{
     UseIntervalReturn, UseTimeoutFnReturn,
 };
 use logging::warn;
-use tracing::info;
+use tracing::{debug, info};
 use uuid::Uuid;
 use wasm_bindgen::JsCast;
 use web_sys::MediaStream;
@@ -13,7 +13,8 @@ use web_sys::MediaStream;
 use crate::{
     components::toaster::{Toast, Toaster},
     networking::room_manager::RoomManager,
-    MountPoints,
+    utils::download_logs,
+    LogProvider, MountPoints,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -163,8 +164,9 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                         crate::networking::room_manager::PlayerMessages::Play(time) => {
                             if player_status.is_paused() {
                                 info!("Received play");
+                                info!("Set current time on play {time}");
+                                video.set_current_time(*time);
                                 if let Err(err) = video.play() {
-                                    video.set_current_time(*time);
                                     warn!("Can not play video {err:#?}")
                                 }
                             }
@@ -172,8 +174,10 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                         crate::networking::room_manager::PlayerMessages::Pause(time) => {
                             if !player_status.is_paused() {
                                 info!("Received pause");
+
+                                info!("Set current time on pause {time}");
+                                video.set_current_time(*time);
                                 if let Err(err) = video.pause() {
-                                    video.set_current_time(*time);
                                     warn!("Can not play video {err:#?}")
                                 }
                             }
@@ -186,6 +190,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                                 | VideoType::LocalStreamingOut => {
                                     video.pause();
 
+                                    info!("Set current time on seek {time}");
                                     video.set_current_time(*time);
                                     before_seek.set_value(Some(*beforeseek));
                                 }
@@ -211,6 +216,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                                             VideoType::None
                                             | VideoType::Local
                                             | VideoType::LocalStreamingOut => {
+                                                info!("Set current time on difference {time}");
                                                 video.set_current_time(time);
                                             }
                                             VideoType::RemoteStreamingIn => {
@@ -328,6 +334,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                     class="h-full w-full"
                     preload="auto"
                     on:canplay=move |_| {
+                        debug!("video: Received canplay");
                         if let Some(video) = video_node.get_untracked() {
                             if video.paused() {
                                 set_video_state.set(VideoState::Paused);
@@ -337,6 +344,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                         }
                     }
                     on:canplaythrough=move |_| {
+                        debug!("video: Received canplaythrough");
                         if let Some(video) = video_node.get_untracked() {
                             if video.paused() {
                                 set_video_state.set(VideoState::Paused);
@@ -346,19 +354,40 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                         }
                     }
                     on:ended=move |_| {
+                        debug!("video: Received ended");
                         set_video_state.set(VideoState::Ended);
                     }
-                    on:error=move |_| { set_video_state.set(VideoState::Errored) }
-                    on:pause=move |_| { set_video_state.set(VideoState::Paused) }
-                    on:play=move |_| { set_video_state.set(VideoState::Playing); set_is_seeking.set(false); }
-                    on:playing=move |_| { set_video_state.set(VideoState::Playing) }
-                    on:stalled=move |_| { set_video_state.set(VideoState::Stalled) }
-                    on:suspend=move |_| { set_video_state.set(VideoState::Suspend) }
+                    on:error=move |_| {
+                        debug!("video: Received error");
+                        set_video_state.set(VideoState::Errored);
+                    }
+                    on:pause=move |_| {
+                        debug!("video: Received pause");
+                        set_video_state.set(VideoState::Paused);
+                    }
+                    on:play=move |_| {
+                        debug!("video: Received play");
+                        set_video_state.set(VideoState::Playing);
+                        set_is_seeking.set(false);
+                    }
+                    on:playing=move |_| {
+                        debug!("video: Received playing");
+                        set_video_state.set(VideoState::Playing) }
+                    on:stalled=move |_| {
+                        debug!("video: Received stalled");
+                        set_video_state.set(VideoState::Stalled) }
+                    on:suspend=move |_| {
+                        debug!("video: Received suspend");
+                        set_video_state.set(VideoState::Suspend) }
                     on:waiting=move |_| {
+                        debug!("video: Received waiting");
                         set_video_state.set(VideoState::Loading);
                     }
-                    on:seeking=move |_| { set_video_state.set(VideoState::Seeking) }
+                    on:seeking=move |_| {
+                        debug!("video: Received seeking");
+                        set_video_state.set(VideoState::Seeking) }
                     on:seeked=move |_| {
+                        debug!("video: Received seeked");
                         if video_type.get_value() != VideoType::RemoteStreamingIn {
                             if let Some(video) = video_node.get() {
                                 if video.paused() {
@@ -380,6 +409,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                     }
 
                     on:durationchange=move |_| {
+                        debug!("video: Received durationchange");
                         if video_type.get_value() != VideoType::RemoteStreamingIn {
                             if let Some(video) = video_node.get() {
                                 let rm = expect_context::<RoomManager>();
@@ -389,6 +419,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                         }
                     }
                     on:timeupdate=move |_| {
+                        debug!("video: Received timeupdate");
                         if let Some(video) = video_node.get() {
                             if video_type.get_value() != VideoType::RemoteStreamingIn {
                                 set_current_time.set(Some(video.current_time()));
@@ -529,13 +560,16 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                     {move || {
                         if let Some(VideoSource::Url(url)) = src.get() {
                             view! {
-                                <a
-                                    target="_blank"
+                                <button
                                     class="text-2xl font-bold2"
-                                    href=url
+                                    on:click=move|_|{
+                                        if let Some(log_prov) = use_context::<LogProvider>(){
+                                            download_logs(log_prov.logs.get_value());
+                                        }
+                                    }
                                 >
-                                    "Open in new tab"
-                                </a>
+                                    "Download Logs"
+                                </button>
                             }.into_view()
                         } else {
                             view! {}.into_view()
@@ -564,6 +598,8 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                                     }else if VideoState::Seeking != video_state.get_untracked() {
                                         let is_playing = !video.paused();
                                         video.pause();
+
+                                        info!("Set current time on seek local {new_time}");
                                         video.set_current_time(new_time);
                                         set_is_seeking.set(true);
                                         room_manager_c

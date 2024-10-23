@@ -15,7 +15,7 @@ http.workspace = true
 cfg-if.workspace = true
 thiserror.workspace = true
 leptos-use = { workspace = true }
-tracing = { workspace = true, features = ["release_max_level_warn"] }
+tracing = { workspace = true }
 
 common = { path = "../common", default-features = false, features = [
     "hydrate",

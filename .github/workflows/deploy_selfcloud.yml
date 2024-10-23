@@ -37,7 +37,7 @@ jobs:
       run: cargo install cargo-leptos
 
     - name: Build
-      run: cargo leptos build --release
+      run: cargo leptos build --release --lib-features disable-logs
         
     - name: Build Docker image
       run: |

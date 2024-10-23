@@ -73,12 +73,15 @@ base64 = "0.22"
 
 dotenvy = "0.15.7"
 
+time = "0.3.36"
+
 
 [workspace.dependencies.web-sys]
 version = "0.3.70"
 features = [
     "File",
     "Blob",
+    "BlobPropertyBag",
     "Screen",
     "ScreenOrientation",
     "OrientationLockType",

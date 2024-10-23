@@ -18,6 +18,7 @@ pub mod components;
 pub mod error_template;
 pub mod networking;
 pub mod pages;
+pub mod utils;
 pub mod web_glue;
 
 #[derive(Clone)]
@@ -32,6 +33,11 @@ pub struct MountPoints {
 #[derive(Clone)]
 pub struct Endpoint {
     pub main_endpoint: Cow<'static, str>,
+}
+
+#[derive(Clone)]
+pub struct LogProvider {
+    pub logs: StoredValue<String>,
 }
 
 #[component]
