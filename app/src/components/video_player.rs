@@ -332,6 +332,8 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
         >
             <div class="flex-1 overflow-auto w-full relative">
                 <video
+                    playsinline=true
+                    disableRemotePlayback=true
                     ref=video_node
                     class="h-full w-full"
                     preload="auto"

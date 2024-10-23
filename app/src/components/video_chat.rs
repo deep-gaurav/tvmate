@@ -305,6 +305,8 @@ pub fn VideoChat() -> impl IntoView {
                                                 let is_video_active = user.is_video_active;
                                                 view! {
                                                     <video ref={video_ref}
+                                                        playsinline=true
+                                                        disableRemotePlayback=true
                                                         class="w-full -scale-x-100"
                                                         class=("hidden", move || !is_video_active.get())
                                                     />
