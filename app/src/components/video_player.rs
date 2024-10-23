@@ -11,7 +11,7 @@ use wasm_bindgen::JsCast;
 use web_sys::MediaStream;
 
 use crate::{
-    components::toaster::{Toast, Toaster},
+    components::toaster::{Toast, ToastType, Toaster},
     networking::room_manager::RoomManager,
     utils::download_logs,
     LogProvider, MountPoints,
@@ -289,6 +289,8 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
     let room_info = expect_context::<RoomManager>().get_room_info();
 
     let (is_seeking, set_is_seeking) = create_signal(false);
+
+    let (retry, set_retry) = create_signal(0);
     create_effect(move |_| {
         if let Some(VideoSource::Stream((user_id, stream))) = src.get() {
             if let Some(video_node) = video_node.get_untracked() {
@@ -358,6 +360,19 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                         set_video_state.set(VideoState::Ended);
                     }
                     on:error=move |_| {
+                        let toaster = expect_context::<Toaster>();
+                        if retry.get_untracked() < 4 {
+                            toaster.toast(Toast{
+                                message:"Video Errored, retrying".into(),
+                                r#type: ToastType::Failed,
+                            });
+                            set_retry.set(retry.get_untracked() + 1);
+                        }else{
+                            toaster.toast(Toast{
+                                message:"Video Errored many time, giving up".into(),
+                                r#type: ToastType::Failed,
+                            });
+                        }
                         debug!("video: Received error");
                         set_video_state.set(VideoState::Errored);
                     }
@@ -428,6 +443,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                     }
                 >
                     {move || {
+                        retry.get();
                         if let Some(VideoSource::Url(url)) = src.get() {
                             view! { <source src=url /> }.into_view()
                         } else {
