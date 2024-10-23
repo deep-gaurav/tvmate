@@ -29,9 +29,12 @@ pub fn hydrate() {
         .without_time();
 
     let log_mem_write = fmt::layer()
+        .with_line_number(true)
         .with_writer(move || string_writer.clone())
+        .with_ansi(false)
         .without_time()
         .with_level(true)
+        .pretty()
         .with_filter(LevelFilter::DEBUG);
 
     let subscriber = tracing_subscriber::registry()
