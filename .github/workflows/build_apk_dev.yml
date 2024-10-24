@@ -57,7 +57,7 @@ jobs:
       run: cargo install trunk
     
     - name: Install tauri
-      run: cargo install create-tauri-app --locked
+      run: cargo install tauri-cli --version "^2.0.0" --locked
     
     - name: Build APK
       run: cd tauri && cargo tauri android build --apk
