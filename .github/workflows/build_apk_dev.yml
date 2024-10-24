@@ -8,7 +8,11 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: write
+  
 jobs:
+  
   build:
     runs-on: ubuntu-latest
 
@@ -77,3 +81,27 @@ jobs:
       run: cd tauri && cargo tauri android build --apk
       env:
         NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+
+      # First delete existing release if it exists
+    - name: Delete existing release
+      uses: dev-drprasad/delete-tag-and-release@v1.0
+      with:
+        tag_name: latest-dev
+        delete_release: true
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+      continue-on-error: true
+
+    # Create new release
+    - name: Create Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: latest-dev
+        name: Latest Development Build
+        body: |
+          This is an automated pre-release containing the latest build from the master branch.
+          Last updated: ${{ github.event.head_commit.timestamp }}
+          Commit: ${{ github.sha }}
+        prerelease: true
+        files: tauri/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk
+        token: ${{ secrets.GITHUB_TOKEN }}
