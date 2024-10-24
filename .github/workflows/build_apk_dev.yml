@@ -45,18 +45,6 @@ jobs:
         ndk-version: r27c
         add-to-path: false
         link-to-sdk: true
-    - run: rustup toolchain install nightly-2024-08-15
-    - name: Add wasm32
-      run: rustup target add wasm32-unknown-unknown
-  
-    - name: Add aarch64
-      run: rustup target add aarch64-unknown-linux-gnu aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
-
-    - name: Install trunk
-      run: cargo install trunk
-    
-    - name: Install tauri
-      run: cargo install tauri-cli --version "^2.0.0" --locked
 
     - name: Configure Keystore
       run: |
@@ -71,6 +59,20 @@ jobs:
         KEYSTORE_KEY_ALIAS: ${{ secrets.KEY_STORE_ALIAS }}
         KEYSTORE_KEY_PASSWORD: ${{ secrets.KEY_STORE_ALIAS_PASSWORD }}
         KEYSTORE_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+        
+    - run: rustup toolchain install nightly-2024-08-15
+    - name: Add wasm32
+      run: rustup target add wasm32-unknown-unknown
+  
+    - name: Add aarch64
+      run: rustup target add aarch64-unknown-linux-gnu aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+
+    - name: Install trunk
+      run: cargo install trunk
+    
+    - name: Install tauri
+      run: cargo install tauri-cli --version "^2.0.0" --locked
+
     - name: Build APK
       run: cd tauri && cargo tauri android build --apk
       env:
