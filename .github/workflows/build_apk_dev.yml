@@ -33,6 +33,20 @@ jobs:
     - name: Install dependencies
       run: sudo apt update && sudo apt install -y clang cmake libevent-dev libclang-dev libcurl4-openssl-dev curl gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
     
+    - name: Configure Keystore
+      run: |
+        echo "$KEYSTORE" | base64 --decode > tauri/src-tauri/gen/android/keystore.jks
+        echo "storeFile=upload-keystore.jks" > tauri/src-tauri/gen/android/keystore.properties
+        echo "keyAlias=$KEYSTORE_KEY_ALIAS" >> tauri/src-tauri/gen/android/keystore.properties
+        echo "storePassword=$KEYSTORE_STORE_PASSWORD" >> tauri/src-tauri/gen/android/keystore.properties
+        echo "password=$KEYSTORE_KEY_PASSWORD" >> tauri/src-tauri/gen/android/keystore.properties
+        echo "storeFile=../keystore.jks" >> tauri/src-tauri/gen/android/keystore.properties
+      env:
+        KEYSTORE: ${{ secrets.KEYSTORE }}
+        KEYSTORE_KEY_ALIAS: ${{ secrets.KEY_STORE_ALIAS }}
+        KEYSTORE_KEY_PASSWORD: ${{ secrets.KEY_STORE_ALIAS_PASSWORD }}
+        KEYSTORE_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+        
     - name: Set up JDK 21
       uses: actions/setup-java@v3
       with:
@@ -46,20 +60,6 @@ jobs:
         add-to-path: false
         link-to-sdk: true
 
-    - name: Configure Keystore
-      run: |
-        echo "$PLAY_STORE_UPLOAD_KEY" | base64 --decode > tauri/src-tauri/gen/android/keystore.jks
-        echo "storeFile=upload-keystore.jks" > tauri/src-tauri/gen/android/keystore.properties
-        echo "keyAlias=$KEYSTORE_KEY_ALIAS" >> tauri/src-tauri/gen/android/keystore.properties
-        echo "storePassword=$KEYSTORE_STORE_PASSWORD" >> tauri/src-tauri/gen/android/keystore.properties
-        echo "password=$KEYSTORE_KEY_PASSWORD" >> tauri/src-tauri/gen/android/keystore.properties
-        echo "storeFile=../keystore.jks" >> tauri/src-tauri/gen/android/keystore.properties
-      env:
-        PLAY_STORE_UPLOAD_KEY: ${{ secrets.RELEASE_KEYSTORE }}
-        KEYSTORE_KEY_ALIAS: ${{ secrets.KEY_STORE_ALIAS }}
-        KEYSTORE_KEY_PASSWORD: ${{ secrets.KEY_STORE_ALIAS_PASSWORD }}
-        KEYSTORE_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
-        
     - run: rustup toolchain install nightly-2024-08-15
     - name: Add wasm32
       run: rustup target add wasm32-unknown-unknown
