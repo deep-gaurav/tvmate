@@ -18,6 +18,7 @@ pub mod components;
 pub mod error_template;
 pub mod networking;
 pub mod pages;
+pub mod tauri_provider;
 pub mod utils;
 pub mod web_glue;
 

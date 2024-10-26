@@ -2,7 +2,16 @@
 
 [workspace]
 resolver = "2"
-members = ["app", "common", "frontend", "server", "tauri", "tauri/src-tauri"]
+members = [
+    "app",
+    "common",
+    "frontend",
+    "server",
+    "tauri",
+    "tauri/src-tauri",
+    "tauri/tauri-plugin-tvmate",
+    "tauri/tauri-plugin-tvmate/examples/vanilla/src-tauri",
+]
 
 # need to be applied only to wasm build
 [profile.release]
@@ -74,6 +83,15 @@ base64 = "0.22"
 dotenvy = "0.15.7"
 
 time = "0.3.36"
+
+
+tauri = "2.0.6"
+tauri-plugin-shell = "2.0.2"
+
+tauri-sys = { git = "https://github.com/JonasKruckenberg/tauri-sys", branch = "v2", features = [
+    "event",
+    "core",
+] }
 
 
 [workspace.dependencies.web-sys]

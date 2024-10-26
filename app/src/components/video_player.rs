@@ -1,4 +1,7 @@
+use std::{future::Future, pin::Pin};
+
 use common::PlayerStatus;
+use futures::FutureExt;
 use leptos::*;
 use leptos_use::{
     use_event_listener, use_interval_fn, use_throttle_fn_with_arg, use_timeout_fn,
@@ -13,6 +16,7 @@ use web_sys::MediaStream;
 use crate::{
     components::toaster::{Toast, ToastType, Toaster},
     networking::room_manager::RoomManager,
+    tauri_provider::FullScreenProvider,
     utils::download_logs,
     LogProvider, MountPoints,
 };
@@ -337,7 +341,6 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                     ref=video_node
                     class="h-full w-full"
                     preload="auto"
-                    controls
                     on:canplay=move |_| {
                         debug!("video: Received canplay");
                         if let Some(video) = video_node.get_untracked() {
@@ -520,7 +523,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                 }}
                 <div
                     class="absolute h-full w-full top-0 left-0 bg-black/70 opacity-0
-                    flex flex-col items-center justify-center hidden
+                    flex flex-col items-center justify-center
                     "
                     class=("opacity-100", is_ui_open)
                     on:mousemove=move |_| {
@@ -678,6 +681,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                         <button on:click=move |_| {
                             if let Some(video_base) = main_ref.get_untracked() {
                                 let toaster = expect_context::<Toaster>();
+                                let fullscreenprovider = use_context::<FullScreenProvider>();
                                 if !is_full_screen.get_untracked() {
                                     if let Err(err) = video_base.request_fullscreen() {
                                         warn!("Cannot enter full screen {err:?}");
@@ -686,6 +690,9 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                                             r#type: crate::components::toaster::ToastType::Failed,
                                         });
                                     } else if let Ok(screen) = window().screen() {
+                                        if let Some(fullscreenprovider) = fullscreenprovider {
+                                            fullscreenprovider.fullscreen.call(());
+                                        }
                                         if let Err(err) = screen
                                             .orientation()
                                             .lock(web_sys::OrientationLockType::Landscape)
@@ -695,6 +702,9 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                                     }
                                 } else {
                                     document().exit_fullscreen();
+                                    if let Some(fullscreenprovider) = fullscreenprovider {
+                                        fullscreenprovider.exit_fullscreen.call(());
+                                    }
                                     if let Ok(screen) = window().screen() {
                                         if let Err(err) = screen.orientation().unlock() {
                                             warn!("Cant unlock orientation {err:?}")

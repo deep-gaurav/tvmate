@@ -30,6 +30,8 @@ serde.workspace = true
 
 wasm-bindgen-futures.workspace = true
 
+futures.workspace = true
+
 [features]
 default = []
 hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]

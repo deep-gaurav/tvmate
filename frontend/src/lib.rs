@@ -4,6 +4,7 @@ use app::*;
 use leptos::*;
 use tracing::{level_filters::LevelFilter, subscriber::set_global_default};
 use tracing_subscriber::{fmt::format::Writer, layer::SubscriberExt, Layer};
+use utils::StringWriter;
 use wasm_bindgen::prelude::wasm_bindgen;
 use web_sys::js_sys::Date;
 
@@ -54,30 +55,4 @@ pub fn hydrate() {
         provide_context(log_provider);
         view! { <App /> }
     });
-}
-
-#[derive(Clone)]
-struct StringWriter {
-    log_buffer: StoredValue<String>,
-}
-
-impl Write for StringWriter {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        if let Ok(s) = String::from_utf8(buf.to_vec()) {
-            let date = Date::new_0();
-            self.log_buffer.update_value(|buffer| {
-                buffer.push_str(&format!("{}: {}", date.to_string(), &s));
-            });
-            Ok(buf.len())
-        } else {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Invalid UTF-8",
-            ))
-        }
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
 }
