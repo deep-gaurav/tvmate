@@ -18,5 +18,8 @@ tracing-subscriber.workspace = true
 tracing-subscriber-wasm.workspace = true
 tracing.workspace = true
 
+tauri-sys = { workspace = true }
+futures.workspace = true
+
 [features]
 ssr = [] # Only to satisfy vscode, does nothing
