@@ -1,6 +1,8 @@
+use tauri::AppHandle;
+
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 #[tauri::command]
-fn greet(name: &str) -> String {
+fn greet(app_handle: AppHandle, name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
