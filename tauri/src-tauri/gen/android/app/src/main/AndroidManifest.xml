@@ -14,7 +14,7 @@
         android:name="android.hardware.camera.autofocus" />
     <uses-permission
         android:name="android.permission.RECORD_AUDIO" /> // don't miss this one <uses-permission
-        android:name="android.permission.MODIFY_AUDIO_SETTINGS" /> 
+        android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <application
         android:icon="@mipmap/ic_launcher"
