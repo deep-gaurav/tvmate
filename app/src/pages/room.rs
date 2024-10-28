@@ -8,9 +8,13 @@ use web_sys::MediaStream;
 use crate::{
     apis::get_room_info,
     components::{
-        audio_chat::AudioChat, chatbox::ChatBox, help_dialog::RoomHelpDialog,
-        join_dialog::JoinDialog, room_info::RoomInfo, video_chat::VideoChat,
-        video_player::VideoPlayer,
+        audio_chat::AudioChat,
+        chatbox::ChatBox,
+        help_dialog::RoomHelpDialog,
+        join_dialog::JoinDialog,
+        room_info::RoomInfo,
+        video_chat::VideoChat,
+        video_player::{VideoPlayer, VideoSource},
     },
     networking::room_manager::RoomManager,
 };
@@ -200,6 +204,22 @@ pub fn RoomPage() -> impl IntoView {
                                 />
                             </div>
 
+                            <div
+                                class="h-4"
+                            >"Or"</div>
+
+
+                            <div
+                                class="h-full w-full my-8 p-4 flex flex-col items-center justify-center border-white border-solid border-2 rounded-sm"
+                            >
+                                <button class="px-1 hover:bg-slate-700 active:bg-slate-900"
+                                    on:click=move|_|{
+                                        set_video_url.set(Some(VideoSource::Youtube));
+                                    }
+                                >
+                                    "[ Open Youtube ]"
+                                </button>
+                            </div>
 
                             <div
                                 class="h-4"
