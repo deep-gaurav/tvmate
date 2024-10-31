@@ -6,6 +6,7 @@ use web_sys::ShareData;
 use crate::{
     components::{icons::Icon, portal::Portal},
     networking::room_manager::RoomManager,
+    tauri_provider::{FullScreenProvider, ShareRequest},
     MountPoints,
 };
 
@@ -64,19 +65,12 @@ pub fn ChatBox() -> impl IntoView {
                                                 on:click=move|_|{
                                                     let url = window().location().href();
                                                     if let Ok(url) = url {
-                                                        let navigator = window().navigator();
-                                                        let share =  navigator.share_with_data(&{
-                                                            let share_data = ShareData::new();
-                                                            share_data.set_url(&url);
-                                                            share_data.set_title("Let's have a watch party together, join me on TVMate with following link.");
-                                                            share_data
-                                                        });
-                                                        let wasm_fut = wasm_bindgen_futures::JsFuture::from(share);
-                                                        leptos::spawn_local(async move {
-                                                            if let Err(err) = wasm_fut.await {
-                                                                warn!("Cannot share link {err:?}");
-                                                            }
-                                                        });
+                                                        let native_provider = use_context::<FullScreenProvider>();
+                                                        if let Some(native_provider) = native_provider {
+                                                            native_provider.share_url.call(ShareRequest{
+                                                                url
+                                                            });
+                                                        }
                                                     }else{
                                                         warn!("Cant get url")
                                                     }

@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+pub use app::tauri_provider::ShareRequest;
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PingRequest {

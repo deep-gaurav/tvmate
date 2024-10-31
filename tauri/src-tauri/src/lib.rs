@@ -1,5 +1,5 @@
 use tauri::AppHandle;
-use tauri_plugin_tvmate::{FullScreenRequest, TvmateExt};
+use tauri_plugin_tvmate::{FullScreenRequest, ShareRequest, TvmateExt};
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 #[tauri::command]
@@ -26,6 +26,11 @@ fn exit_fullscreen(app_handle: AppHandle) -> String {
     return format!("{result:?}");
 }
 
+#[tauri::command]
+fn share(app_handle: AppHandle, payload: ShareRequest) -> () {
+    let result = app_handle.tvmate().share_url(payload);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -33,6 +38,7 @@ pub fn run() {
         .plugin(tauri_plugin_tvmate::init())
         .invoke_handler(tauri::generate_handler![
             greet,
+            share,
             fullscreen,
             is_fullscreen,
             exit_fullscreen

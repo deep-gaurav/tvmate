@@ -1,6 +1,11 @@
-use app::{tauri_provider::FullScreenProvider, utils::StringWriter, App, Endpoint, LogProvider};
+use app::{
+    tauri_provider::{FullScreenProvider, ShareRequest},
+    utils::StringWriter,
+    App, Endpoint, LogProvider,
+};
 use futures::FutureExt;
 use leptos::*;
+use serde::{Deserialize, Serialize};
 use tracing::{info, level_filters::LevelFilter, subscriber::set_global_default};
 use tracing_subscriber::{layer::SubscriberExt, Layer};
 use wasm_bindgen::JsValue;
@@ -63,6 +68,17 @@ fn main() {
                     tauri_sys::core::invoke("fullscreen", Option::<String>::None).await;
             });
             true
+        }),
+        share_url: Callback::new(move |request: ShareRequest| {
+            leptos::spawn_local(async move {
+                #[derive(Serialize, Deserialize)]
+                struct Payload {
+                    payload: ShareRequest,
+                };
+
+                let response: Option<String> =
+                    tauri_sys::core::invoke("share", Payload { payload: request }).await;
+            });
         }),
     };
     mount_to_body(|| {

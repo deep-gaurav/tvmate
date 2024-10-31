@@ -42,4 +42,10 @@ impl<R: Runtime> Tvmate<R> {
             .run_mobile_plugin("fullscreen", payload)
             .map_err(Into::into)
     }
+
+    pub fn share_url(&self, payload: ShareRequest) -> crate::Result<()> {
+        self.0
+            .run_mobile_plugin("shareUrl", payload)
+            .map_err(Into::into)
+    }
 }

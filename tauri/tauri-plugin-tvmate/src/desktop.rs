@@ -25,4 +25,8 @@ impl<R: Runtime> Tvmate<R> {
     pub fn fullscreen(&self, payload: FullScreenRequest) -> crate::Result<FullScreenResponse> {
         unimplemented!("Full screen not implemented in desktop")
     }
+
+    pub fn share_url(&self, payload: ShareRequest) -> crate::Result<()> {
+        unimplemented!("Share not implemented in desktop")
+    }
 }

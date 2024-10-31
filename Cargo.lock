@@ -1277,6 +1277,7 @@ dependencies = [
  "tracing-subscriber",
  "tracing-subscriber-wasm",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -4833,6 +4834,7 @@ dependencies = [
 name = "tauri-plugin-tvmate"
 version = "0.1.0"
 dependencies = [
+ "app",
  "serde",
  "tauri",
  "tauri-plugin",

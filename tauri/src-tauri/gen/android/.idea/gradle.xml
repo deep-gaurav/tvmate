@@ -20,11 +20,12 @@
         <option name="gradleJvm" value="#GRADLE_LOCAL_JAVA_HOME" />
         <option name="modules">
           <set>
-            <option value="$USER_HOME$/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tauri-2.0.1/mobile/android" />
-            <option value="$USER_HOME$/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tauri-plugin-shell-2.0.1/android" />
+            <option value="$USER_HOME$/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tauri-2.0.6/mobile/android" />
+            <option value="$USER_HOME$/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tauri-plugin-shell-2.0.2/android" />
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/app" />
             <option value="$PROJECT_DIR$/buildSrc" />
+            <option value="$PROJECT_DIR$/../../../tauri-plugin-tvmate/android" />
           </set>
         </option>
         <option name="resolveExternalAnnotations" value="false" />

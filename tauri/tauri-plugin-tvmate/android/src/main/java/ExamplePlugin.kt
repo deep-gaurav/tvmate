@@ -1,6 +1,7 @@
 package com.plugin.tvmate
 
 import android.app.Activity
+import android.content.Intent
 import android.view.View
 import android.view.Window
 import android.view.WindowManager
@@ -11,9 +12,17 @@ import androidx.core.view.WindowInsetsControllerCompat
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
 import app.tauri.annotation.TauriPlugin
+import app.tauri.plugin.Channel
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
 import app.tauri.plugin.Invoke
+
+@InvokeArg
+internal class ShareArgs {
+    var title: String? = null
+    lateinit var url: String
+}
+
 
 @TauriPlugin
 class ExamplePlugin(private val activity: Activity): Plugin(activity) {
@@ -65,5 +74,16 @@ class ExamplePlugin(private val activity: Activity): Plugin(activity) {
         val result = JSObject()
         result.put("is_fullscreen", result)
         invoke.resolve(result)
+    }
+
+    @Command
+    fun shareUrl(invoke: Invoke) {
+        val shareArgs =   invoke.parseArgs(ShareArgs::class.java)
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, shareArgs.url)
+        }
+        activity.startActivity(Intent.createChooser(shareIntent, "Share via"))
+        invoke.resolve() 
     }
 }

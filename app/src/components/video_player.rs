@@ -11,7 +11,7 @@ use logging::warn;
 use tracing::{debug, info};
 use uuid::Uuid;
 use wasm_bindgen::JsCast;
-use web_sys::MediaStream;
+use web_sys::{Element, MediaStream};
 
 use crate::{
     components::toaster::{Toast, ToastType, Toaster},
@@ -680,35 +680,15 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                     <div class="absolute top-[85%] left-[5%]">
                         <button on:click=move |_| {
                             if let Some(video_base) = main_ref.get_untracked() {
-                                let toaster = expect_context::<Toaster>();
                                 let fullscreenprovider = use_context::<FullScreenProvider>();
                                 if !is_full_screen.get_untracked() {
-                                    if let Err(err) = video_base.request_fullscreen() {
-                                        warn!("Cannot enter full screen {err:?}");
-                                        toaster.toast(Toast{
-                                            message: format!("Full screen failed {err:?}").into(),
-                                            r#type: crate::components::toaster::ToastType::Failed,
-                                        });
-                                    } else if let Ok(screen) = window().screen() {
-                                        if let Some(fullscreenprovider) = fullscreenprovider {
-                                            fullscreenprovider.fullscreen.call(());
-                                        }
-                                        if let Err(err) = screen
-                                            .orientation()
-                                            .lock(web_sys::OrientationLockType::Landscape)
-                                        {
-                                            warn!("Cant lock orientation {err:?}")
-                                        }
+                                    if let Some(fullscreenprovider) = fullscreenprovider {
+                                        let el: &Element = video_base.as_ref();
+                                        fullscreenprovider.fullscreen.call(el.clone());
                                     }
                                 } else {
-                                    document().exit_fullscreen();
                                     if let Some(fullscreenprovider) = fullscreenprovider {
                                         fullscreenprovider.exit_fullscreen.call(());
-                                    }
-                                    if let Ok(screen) = window().screen() {
-                                        if let Err(err) = screen.orientation().unlock() {
-                                            warn!("Cant unlock orientation {err:?}")
-                                        }
                                     }
                                 }
                             }
