@@ -48,11 +48,10 @@ impl std::fmt::Display for VideoState {
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone)]
 pub enum VideoSource {
     Url(String),
     Stream((Uuid, MediaStream)),
-    Youtube,
 }
 
 #[derive(Clone, PartialEq)]
@@ -61,7 +60,6 @@ pub enum VideoType {
     Local,
     LocalStreamingOut,
     RemoteStreamingIn,
-    Youtube,
 }
 
 #[component]
@@ -136,9 +134,6 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                 VideoSource::Stream(_) => {
                     video_type.set_value(VideoType::RemoteStreamingIn);
                 }
-                VideoSource::Youtube => {
-                    video_type.set_value(VideoType::Youtube);
-                }
             }
         }
     });
@@ -203,7 +198,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                                     video.set_current_time(*time);
                                     before_seek.set_value(Some(*beforeseek));
                                 }
-                                VideoType::RemoteStreamingIn | VideoType::Youtube => {
+                                VideoType::RemoteStreamingIn => {
                                     //Ignore
                                 }
                             }
@@ -228,7 +223,7 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                                                 info!("Set current time on difference {time}");
                                                 video.set_current_time(time);
                                             }
-                                            VideoType::RemoteStreamingIn | VideoType::Youtube => {
+                                            VideoType::RemoteStreamingIn => {
                                                 //Ignore
                                             }
                                         }
@@ -340,28 +335,11 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
             class=("hidden", move || src.with(|v| v.is_none()))
         >
             <div class="flex-1 overflow-auto w-full relative">
-                {
-                    move || {
-                        if src.get() == Some(VideoSource::Youtube) {
-                            view!{
-                                <iframe
-                                    class="h-full w-full"
-                                    src="https://youtube.com"
-                                />
-                            }.into_view()
-                        }else{
-                            view!{
-
-                            }.into_view()
-                        }
-                    }
-                }
                 <video
                     playsinline=true
                     disableRemotePlayback=true
                     ref=video_node
                     class="h-full w-full"
-                    class=("hidden", move || matches!(src.get(), Some(VideoSource::Youtube)))
                     preload="auto"
                     on:canplay=move |_| {
                         debug!("video: Received canplay");
@@ -705,12 +683,6 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                                 let toaster = expect_context::<Toaster>();
                                 let fullscreenprovider = use_context::<FullScreenProvider>();
                                 if !is_full_screen.get_untracked() {
-                                    toaster.toast(
-                                        Toast{
-                                            message: "Going fullscreen".into(),
-                                            r#type: crate::components::toaster::ToastType::Info,
-                                        }
-                                    );
                                     if let Err(err) = video_base.request_fullscreen() {
                                         warn!("Cannot enter full screen {err:?}");
                                         toaster.toast(Toast{
@@ -718,12 +690,6 @@ pub fn VideoPlayer(#[prop(into)] src: Signal<Option<VideoSource>>) -> impl IntoV
                                             r#type: crate::components::toaster::ToastType::Failed,
                                         });
                                     } else if let Ok(screen) = window().screen() {
-                                        toaster.toast(
-                                            Toast{
-                                                message: "Should be full screen".into(),
-                                                r#type: crate::components::toaster::ToastType::Info,
-                                            }
-                                        );
                                         if let Some(fullscreenprovider) = fullscreenprovider {
                                             fullscreenprovider.fullscreen.call(());
                                         }
